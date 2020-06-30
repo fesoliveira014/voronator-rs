@@ -2,4 +2,4 @@
 Cargo.lock
 /.vscode
 /exemples/output
-*.png
+plot.png

@@ -11,8 +11,9 @@
 //! Apart from the triangle center they are using, the Voronoi and Centroidal diagrams differ 
 //! in how they handle the hull cells. The Voronoi diagram implements a clipping algorithm that
 //! clips the diagram into a bounding box, thus extracting neat polygons around the hull. The 
-//! Centroid diagram, in the other hand, doesn't. The outer cells can be missing or distorted, 
-//! as it degenerates around there. 
+//! Centroid diagram, in the other hand, doesn't. The outer cells can be missing or be distorted, 
+//! as triangles calculated by the Delaunay triangulation can be too thin in the hull, causing
+//! centroid calculation to be "bad".
 //! 
 //! If you have a robust solution for this particular problem, please let me know either by 
 //! creating an issue or through a pull-request, and I will make sure to add your solution with

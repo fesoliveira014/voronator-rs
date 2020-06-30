@@ -8,14 +8,14 @@ use voronator::{CentroidDiagram, VoronoiDiagram};
 use plotters::prelude::*;
 use rand::prelude::*;
 
-const IMG_WIDTH: u32 = 2000;
-const IMG_HEIGHT: u32 = 1000;
+const IMG_WIDTH: u32 = 500;
+const IMG_HEIGHT: u32 = 500;
 
 fn get_points(n: i32, jitter: f64) -> Vec<Point> {
     let mut rng = rand::thread_rng();
     let mut points: Vec<Point> = vec![];
-    for i in 0..2*n {
-        for j in -1..n+2 {
+    for i in 0..n+1 {
+        for j in 0..n+1 {
             points.push(Point{
                 x: (i as f64) + jitter * (rng.gen::<f64>() - rng.gen::<f64>()), 
                 y: (j as f64) + jitter * (rng.gen::<f64>() - rng.gen::<f64>()) 
@@ -29,7 +29,7 @@ fn get_points(n: i32, jitter: f64) -> Vec<Point> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = rand::thread_rng();
 
-    let size = 50;
+    let size = 10;
     let points: Vec<Point> = get_points(size, 0.6)
         .into_iter()
         .map(|p| Point{
@@ -54,12 +54,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("triangles: {}", diagram.delaunay.len());
     println!("cells: {}", diagram.cells.len());
 
-    for cell in diagram.cells {
-        let color = RGBColor{0: rng.gen(), 1: rng.gen(), 2: rng.gen()};
-        let p: Vec<(f32, f32)> = cell.into_iter().map(|x| (x.x as f32, x.y as f32)).collect();
+    // for cell in &diagram.cells {
+    //     let color = RGBColor{0: rng.gen(), 1: rng.gen(), 2: rng.gen()};
+    //     let p: Vec<(f32, f32)> = cell.into_iter().map(|x| (x.x as f32, x.y as f32)).collect();
 
-        let poly = Polygon::new(p.clone(), ShapeStyle{color: color.to_rgba(), filled: true, stroke_width: 2});
-        root.draw(&poly)?;
+    //     let poly = Polygon::new(p.clone(), ShapeStyle{color: color.to_rgba(), filled: true, stroke_width: 2});
+    //     root.draw(&poly)?;
+    // }
+
+    for cell in &diagram.cells {
+        let p: Vec<(f32, f32)> = cell.into_iter().map(|x| (x.x as f32, x.y as f32)).collect();
 
         for _ in 0..p.len() {
             let plot = PathElement::new(p.clone(), ShapeStyle{color: BLACK.to_rgba(), filled: true, stroke_width: 1});    
