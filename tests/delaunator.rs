@@ -1,7 +1,7 @@
 extern crate voronator;
 extern crate serde_json;
 
-use voronator::delaunator::{triangulate, Point, INVALID_INDEX, EPSILON};
+use voronator::delaunator::{triangulate, Point, Triangulation, INVALID_INDEX, EPSILON};
 use std::f64;
 use std::fs::File;
 
@@ -115,6 +115,51 @@ fn load_fixture(path: &str) -> Vec<Point> {
     u.iter().map(|p| Point { x: p.0, y: p.1 }).collect()
 }
 
+fn triangle_area(points: &[Point], delaunay: &Triangulation) -> f64 {
+    let mut vals: Vec<f64> = Vec::new();
+    let mut t = 0;
+    while t < delaunay.triangles.len() {
+        let a = &points[delaunay.triangles[t]];
+        let b = &points[delaunay.triangles[t+1]];
+        let c = &points[delaunay.triangles[t+2]];
+        let val = ((b.y - a.y) * (c.x - b.x) - 
+                   (b.x - a.x) * (c.y - b.y)).abs();
+        vals.push(val);
+        t += 3;
+    }
+    better_sum(&vals)
+}
+
+fn hull_area(points: &[Point], delaunay: &Triangulation) -> f64 {
+    let mut hull_areas = Vec::new();
+    let mut i = 0;
+    let mut j = delaunay.hull.len() - 1;
+    while i < delaunay.hull.len() {
+        let p0 = &points[delaunay.hull[j]];
+        let p = &points[delaunay.hull[i]];
+        hull_areas.push((p.x - p0.x) * (p.y + p0.y));
+        j = i;
+        i += 1;
+    }
+    better_sum(&hull_areas)
+}
+
+fn better_sum(x: &[f64]) -> f64 {
+    let mut sum = x[0];
+    let mut err: f64 = 0.0;
+    for i in 1..x.len() {
+        let k = x[i];
+        let m = sum + k;
+        err += if sum.abs() >= k.abs() {
+            sum - m + k
+        } else {
+            k - m + sum
+        };
+        sum = m;
+    }
+    sum + err
+}
+
 fn validate(points: &[Point]) {
     let triangulation = triangulate(&points).expect("No triangulation exists for this input");
 
@@ -126,8 +171,8 @@ fn validate(points: &[Point]) {
     }
 
     // validate triangulation
-    let hull_area = triangulation.hull_area(points);
-    let triangles_area = triangulation.triangle_area(points);
+    let hull_area = hull_area(points, &triangulation);
+    let triangles_area = triangle_area(points, &triangulation);
 
     let err = ((hull_area - triangles_area) / hull_area).abs();
     if err > EPSILON {

@@ -1,11 +1,74 @@
+#![warn(missing_docs)]
+#![warn(missing_doc_code_examples)]
+//! Implements the Delaunay triangulation algorithm.
+//! 
+//! This module was ported from the original [Delaunator](https://github.com/mapbox/delaunator), by Mapbox. If a triangulation is possible a given set of points in the 2D space, it returns a [`Triangulation`] structure. This structure contains three main components: [`triangles`], [`halfedges`] and [`hull`]:
+//! ```ignore
+//! let coords = vec![(0., 0.), (1., 0.), (1., 1.), (0., 1.)];
+//! let (delaunay, _) = delaunator::triangulate_from_tuple(&coords).unwrap();
+//! ```
+//! - `triangles`: A `Vec<usize>` that contains the indices for each vertex of a triangle in the original array. All triangles are directed counter-clockwise. To get the coordinates of all triangles, use:
+//! ```ignore
+//! let t = 0;
+//! loop {
+//!     println!("[{:?}, {:?}, {:?}]",
+//!         coords[delaunay.triangles[t]],
+//!         coords[delaunay.triangles[t+1]],
+//!         coords[delaunay.triangles[t+2]],
+//!     );
+//!     t += 3;
+//! }
+//! ```
+//! - `halfedges`:  `Vec<usize>` array of triangle half-edge indices that allows you to traverse the triangulation. i-th half-edge in the array corresponds to vertex `triangles[i]` the half-edge is coming from. `halfedges[i]` is the index of a twin half-edge in an adjacent triangle (or `INVALID_INDEX` for outer half-edges on the convex hull). The flat array-based data structures might be counterintuitive, but they're one of the key reasons this library is fast.
+//! - `hull`: A `Vec<usize>` array of indices that reference points on the convex hull of the input data, counter-clockwise.
+//! 
+//! The last two components, `inedges` and `outedges`, are for voronator internal use only.
+//! 
+//! # Example
+//! 
+//! ```no_run
+//! extern crate voronator;
+//! 
+//! use voronator::delaunator::{triangulate_from_tuple};
+//! 
+//! fn main() {
+//!     let points = vec![(0., 0.), (1., 0.), (1., 1.), (0., 1.)];
+//!     
+//!     let (t, _) = triangulate_from_tuple(&points)
+//!         .expect("No triangulation exists for this input.");
+//! 
+//!     for i in 0..t.len() {
+//!         let i0 = t.triangles[3*i];
+//!         let i1 = t.triangles[3*i + 1];
+//!         let i2 = t.triangles[3*i + 2];
+//! 
+//!         let p = vec![points[i0], points[i1], points[i2]];
+//! 
+//!         println!("triangle {}: {:?}", i, p);
+//!     }
+//! }
+//! ```
+//! 
+//! [`Triangulation`]: ./struct.Triangulation.html
+//! [`triangles`]: ./struct.Triangulation.html#structfield.triangles
+//! [`halfedges`]: ./struct.Triangulation.html#structfield.halfedges
+//! [`hull`]: ./struct.Triangulation.html#structfield.hull
+
 use std::{f64, usize, fmt};
 use vec;
 
+/// Defines a comparison epsilon used for floating-point comparissons
 pub const EPSILON: f64 = f64::EPSILON * 2.0;
 
+/// Defines an invalid index in the Triangulation vectors
+pub const INVALID_INDEX: usize = usize::max_value();
+
 #[derive(Clone, PartialEq)]
+/// Represents a point in the 2D space. 
 pub struct Point {
+    /// X coordinate of the point
     pub x: f64,
+    /// Y coordinate of the point
     pub y: f64
 }
 
@@ -82,7 +145,14 @@ fn circumradius(a: &Point, b: &Point, c: &Point) -> f64{
     }
 }
 
-fn circumcenter(a: &Point, b: &Point, c: &Point) -> Option<Point> {
+/// Calculates the circumcenter of a triangle, given it's three vertices
+/// 
+/// # Arguments
+/// 
+/// * `a` - The first vertex of the triangle
+/// * `b` - The second vertex of the triangle
+/// * `c` - The third vertex of the triangle
+pub fn circumcenter(a: &Point, b: &Point, c: &Point) -> Option<Point> {
     let d = Point::vector(a, b);
     let e = Point::vector(a, c);
 
@@ -124,8 +194,11 @@ fn counter_clockwise(p0: &Point, p1: &Point, p2: &Point) -> bool {
     det > 0.
 }
 
-pub const INVALID_INDEX: usize = usize::max_value();
-
+/// Returs the next halfedge for a given halfedge
+/// 
+/// # Arguments
+/// 
+/// * `i` - The current halfedge index
 pub fn next_halfedge(i: usize) -> usize {
     if i % 3 == 2 {
         i - 2
@@ -134,6 +207,11 @@ pub fn next_halfedge(i: usize) -> usize {
     }
 }
 
+/// Returs the previous halfedge for a given halfedge
+/// 
+/// # Arguments
+/// 
+/// * `i` - The current halfedge index
 pub fn prev_halfedge(i: usize) -> usize {
     if i % 3 == 0 {
         i + 2
@@ -142,22 +220,106 @@ pub fn prev_halfedge(i: usize) -> usize {
     }
 }
 
+/// Returns a vec containing indices for the 3 edges of a triangle t
+/// 
+/// # Arguments
+/// 
+/// * `t` - The triangle index
+pub fn edges_of_triangle(t: usize) -> Vec<usize> {
+    vec![3*t, 3*t + 1, 3*t + 2]
+}
+
+/// Returns the triangle associated with the given edge
+/// 
+/// # Arguments
+/// 
+/// * `e` - The edge index
+pub fn triangle_of_edge(e: usize) -> usize {
+    ((e as f64) / 3.).floor() as usize
+}
+
+/// Returns a vec containing the indices of the corners of the given triangle
+/// 
+/// # Arguments
+/// 
+/// * `t` - The triangle index
+/// * `delaunay` - A reference to a fully constructed Triangulation
+pub fn points_of_triangle(t: usize, delaunay: &Triangulation) -> Vec<usize> {
+    let edges = edges_of_triangle(t);
+    edges.into_iter().map(|e| delaunay.triangles[e]).collect()
+}
+
+/// Returns a vec containing the indices for the adjacent triangles of the given triangle
+/// 
+/// # Arguments
+/// 
+/// * `t` - The triangle index
+/// * `delaunay` - A reference to a fully constructed Triangulation
+pub fn triangles_adjacent_to_triangle(t: usize, delaunay: &Triangulation) -> Vec<usize> {
+    let mut adjacent_triangles: Vec<usize> = vec![];
+    for e in edges_of_triangle(t) {
+        let opposite = delaunay.halfedges[e];
+        if opposite != INVALID_INDEX {
+            adjacent_triangles.push(triangle_of_edge(opposite));
+        }
+    }
+    adjacent_triangles
+}
+
+/// Returns a vec containing all edges around a point
+/// 
+/// # Arguments
+/// 
+/// * `start` - The start point index
+/// * `delaunay` - A reference to a fully constructed Triangulation
+pub fn edges_around_point(start: usize, delaunay: &Triangulation) -> Vec<usize> {
+    let mut result: Vec<usize> = vec![];
+    let mut incoming = start;
+    loop {
+        result.push(incoming);
+        let outgoing = next_halfedge(incoming);
+        incoming = delaunay.halfedges[outgoing];
+        if incoming == INVALID_INDEX || incoming == start {
+            break;
+        }
+    }
+    result
+}
+
+/// Represents a Delaunay triangulation for a given set of points. See example in [`delaunator`] for usage details.
+/// 
+/// [`delaunator`]: ./index.html#example
+
 pub struct Triangulation {
+    /// Contains the indices for each vertex of a triangle in the original array. All triangles are directed counter-clockwise.
     pub triangles: Vec<usize>,
+    /// A `Vec<usize>` of triangle half-edge indices that allows you to traverse the triangulation. i-th half-edge in the array corresponds to vertex `triangles[i]` the half-edge is coming from. `halfedges[i]` is the index of a twin half-edge in an adjacent triangle (or `INVALID_INDEX` for outer half-edges on the convex hull).
     pub halfedges: Vec<usize>,
+    /// A `Vec<usize>` array of indices that reference points on the convex hull of the input data, counter-clockwise.
     pub hull: Vec<usize>,
+    /// A `Vec<usize>` that contains indices for halfedges of points in the hull that points inwards to the diagram. Only for [`voronator`] internal use.
+    /// 
+    /// [`voronator`]: ../index.html
+    pub inedges: Vec<usize>,
+    /// A `Vec<usize>` that contains indices for halfedges of points in the hull that points outwards to the diagram. Only for [`voronator`] internal use.
+    /// 
+    /// [`voronator`]: ../index.html
+    pub outedges: Vec<usize>,
 }
 
 impl Triangulation {
-    pub fn new(n: usize) -> Self {
+    fn new(n: usize) -> Self {
         let max_triangles = 2 * n - 5;
         Self {
             triangles: Vec::with_capacity(max_triangles * 3),
             halfedges: Vec::with_capacity(max_triangles * 3),
             hull: Vec::new(),
+            inedges: vec![INVALID_INDEX; n],
+            outedges: vec![INVALID_INDEX; n],
         }
     }
 
+    /// Returns the number of triangles calculated in the triangulation. Same as `triangles.len() / 3`.
     pub fn len(&self) -> usize {
         self.triangles.len() / 3
     }
@@ -308,35 +470,6 @@ impl Triangulation {
 
         t
     }
-
-    pub fn triangle_area(&self, points: &[Point]) -> f64 {
-        let mut vals: Vec<f64> = Vec::new();
-        let mut t = 0;
-        while t < self.triangles.len() {
-            let a = &points[self.triangles[t]];
-            let b = &points[self.triangles[t+1]];
-            let c = &points[self.triangles[t+2]];
-            let val = ((b.y - a.y) * (c.x - b.x) - 
-                       (b.x - a.x) * (c.y - b.y)).abs();
-            vals.push(val);
-            t += 3;
-        }
-        better_sum(&vals)
-    }
-
-    pub fn hull_area(&self, points: &[Point]) -> f64 {
-        let mut hull_areas = Vec::new();
-        let mut i = 0;
-        let mut j = self.hull.len() - 1;
-        while i < self.hull.len() {
-            let p0 = &points[self.hull[j]];
-            let p = &points[self.hull[i]];
-            hull_areas.push((p.x - p0.x) * (p.y + p0.y));
-            j = i;
-            i += 1;
-        }
-        better_sum(&hull_areas)
-    }
 }
 
 //@see https://stackoverflow.com/questions/33333363/built-in-mod-vs-custom-mod-function-improve-the-performance-of-modulus-op/33333636#33333636
@@ -359,23 +492,7 @@ fn pseudo_angle(d: &Point) -> f64 {
     }
 }
 
-fn better_sum(x: &[f64]) -> f64 {
-    let mut sum = x[0];
-    let mut err: f64 = 0.0;
-    for i in 1..x.len() {
-        let k = x[i];
-        let m = sum + k;
-        err += if sum.abs() >= k.abs() {
-            sum - m + k
-        } else {
-            k - m + sum
-        };
-        sum = m;
-    }
-    sum + err
-}
-
-pub struct Hull {
+struct Hull {
     prev: Vec<usize>,
     next: Vec<usize>,
     tri: Vec<usize>,
@@ -385,7 +502,7 @@ pub struct Hull {
 }
 
 impl Hull {
-    pub fn new(n: usize, center: &Point, i0: usize, i1: usize, i2: usize, points: &[Point]) -> Self {
+    fn new(n: usize, center: &Point, i0: usize, i1: usize, i2: usize, points: &[Point]) -> Self {
         // initialize a hash table for storing edges of the advancing convex hull
         let hash_len = (n as f64).sqrt().ceil() as usize;
 
@@ -561,7 +678,7 @@ fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize,
     }
 }
 
-fn points(coords: &[f64]) -> Vec<Point> {
+fn to_points(coords: &[f64]) -> Vec<Point> {
     let mut points: Vec<Point> = Vec::new();
 
     let mut i = 0;
@@ -577,6 +694,18 @@ fn points(coords: &[f64]) -> Vec<Point> {
     points
 }
 
+/// Calculates the Delaunay triangulation, if it exists, for a given set of 2D 
+/// points. 
+/// 
+/// Points are passed a flat array of `f64` of size `2n`, where n is the
+/// number of points and for each point `i`, `{x = 2i, y = 2i + 1}` and 
+/// converted internally to `delaunator::Point`. It returns both the triangulation 
+/// and the vector of `delaunator::Point` to be used, if desired. 
+/// 
+/// # Arguments
+/// 
+/// * `coords` - A vector of `f64` of size `2n`, where for each point `i`, `x = 2i` 
+/// and y = `2i + 1`. 
 pub fn triangulate_from_arr(coords: &[f64]) -> Option<(Triangulation, Vec<Point>)> {
     let n = coords.len();
     
@@ -584,12 +713,22 @@ pub fn triangulate_from_arr(coords: &[f64]) -> Option<(Triangulation, Vec<Point>
         return None
     }
     
-    let points = points(coords);
+    let points = to_points(coords);
     let triangulation = triangulate(&points)?;
 
     Some((triangulation, points))
 }
 
+/// Calculates the Delaunay triangulation, if it exists, for a given set of 2D 
+/// points. 
+/// 
+/// Points are passed as a tuple, `(f64, f64)`, and converted internally
+/// to `delaunator::Point`. It returns both the triangulation and the vector of 
+/// Points to be used, if desired. 
+/// 
+/// # Arguments
+/// 
+/// * `coords` - A vector of tuples, where each tuple is a `(f64, f64)`
 pub fn triangulate_from_tuple(coords: &[(f64, f64)]) -> Option<(Triangulation, Vec<Point>)> {
     let points: Vec<Point> = coords.iter()
         .map(|p| Point { x: p.0, y: p.1 })
@@ -600,6 +739,11 @@ pub fn triangulate_from_tuple(coords: &[(f64, f64)]) -> Option<(Triangulation, V
     Some((triangulation, points))
 }
 
+/// Calculates the Delaunay triangulation, if it exists, for a given set of 2D points
+/// 
+/// # Arguments
+/// 
+/// * `points` - The set of points
 pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
     if points.len() < 3 {
         return None;
@@ -719,6 +863,26 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
         hull.hash_edge(&points[e], e);
     }
 
+    for e in 0..triangulation.triangles.len() {
+        let endpoint = triangulation.triangles[next_halfedge(e)];
+        if triangulation.halfedges[e] == INVALID_INDEX ||
+           triangulation.inedges[endpoint] == INVALID_INDEX {
+            triangulation.inedges[endpoint] = e;
+        }
+    }
+
+    let mut vert0: usize;
+    let mut vert1 = hull.start;
+    loop {
+        vert0 = vert1;
+        vert1 = hull.next[vert1];
+        triangulation.inedges[vert1] = hull.tri[vert0];
+        triangulation.outedges[vert0] = hull.tri[vert1];
+        if vert1 == hull.start {
+            break;
+        }
+    }
+
     //eprintln!("copying hull...");
     let mut e = hull.start;
     loop {
@@ -728,6 +892,8 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
             break;
         }
     }
+
+
 
     //eprintln!("done");
 
