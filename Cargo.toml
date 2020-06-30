@@ -3,8 +3,11 @@ name = "voronator"
 version = "0.1.0"
 authors = ["Felipe Santos <fesoliveira@outlook.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license-file = "LICENSE"
+repository = "https://github.com/fesoliveira014/voronator-rs"
+description = "Implements the Voronoi diagram construction as a dual of the Delaunay triangulation for a set of points and the construction of a centroidal tesselation of a Delaunay triangulation."
+categories = ["algorithms", "data-structures", "graphics", "visualization"]
+keywords = ["voronoi", "delaunay", "diagram"]
 
 [dev-dependencies]
 criterion = "0.3.2"
