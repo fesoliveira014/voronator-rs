@@ -225,8 +225,8 @@ pub fn prev_halfedge(i: usize) -> usize {
 /// # Arguments
 /// 
 /// * `t` - The triangle index
-pub fn edges_of_triangle(t: usize) -> Vec<usize> {
-    vec![3*t, 3*t + 1, 3*t + 2]
+pub fn edges_of_triangle(t: usize) -> [usize; 3] {
+    [3*t, 3*t + 1, 3*t + 2]
 }
 
 /// Returns the triangle associated with the given edge
@@ -246,7 +246,7 @@ pub fn triangle_of_edge(e: usize) -> usize {
 /// * `delaunay` - A reference to a fully constructed Triangulation
 pub fn points_of_triangle(t: usize, delaunay: &Triangulation) -> Vec<usize> {
     let edges = edges_of_triangle(t);
-    edges.into_iter().map(|e| delaunay.triangles[e]).collect()
+    edges.iter().map(|e| delaunay.triangles[*e]).collect()
 }
 
 /// Returns a vec containing the indices for the adjacent triangles of the given triangle
@@ -257,8 +257,8 @@ pub fn points_of_triangle(t: usize, delaunay: &Triangulation) -> Vec<usize> {
 /// * `delaunay` - A reference to a fully constructed Triangulation
 pub fn triangles_adjacent_to_triangle(t: usize, delaunay: &Triangulation) -> Vec<usize> {
     let mut adjacent_triangles: Vec<usize> = vec![];
-    for e in edges_of_triangle(t) {
-        let opposite = delaunay.halfedges[e];
+    for e in edges_of_triangle(t).iter() {
+        let opposite = delaunay.halfedges[*e];
         if opposite != INVALID_INDEX {
             adjacent_triangles.push(triangle_of_edge(opposite));
         }
