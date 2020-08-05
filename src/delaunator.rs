@@ -109,6 +109,12 @@ impl Point {
     }
 }
 
+impl From<(f64, f64)> for Point {
+    fn from(item: (f64, f64)) -> Self {
+        Point{x: item.0, y: item.1}
+    }
+}
+
 fn in_circle(p: &Point, a: &Point, b: &Point, c: &Point) -> bool {
     let d = Point::vector(p, a);
     let e = Point::vector(p, b);
