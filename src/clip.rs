@@ -1,6 +1,4 @@
-
 use std::{f64, usize};
-use vec;
 
 use crate::delaunator::Point;
 
@@ -12,7 +10,9 @@ fn project(p: &Point, v: &Point, min: &Point, max: &Point) -> Option<Point> {
 
     if v.y < 0. {
         if p.y <= min.y {
-            {return None;}
+            {
+                return None;
+            }
         }
         (c = (min.y - p.y) / v.y);
         if c < t {
@@ -20,8 +20,7 @@ fn project(p: &Point, v: &Point, min: &Point, max: &Point) -> Option<Point> {
             t = c;
             x = p.x + t * v.x;
         }
-    }
-    else if v.y > 0. {
+    } else if v.y > 0. {
         if p.y >= max.y {
             return None;
         }
@@ -42,8 +41,7 @@ fn project(p: &Point, v: &Point, min: &Point, max: &Point) -> Option<Point> {
             t = c;
             y = p.y + t * v.y;
         }
-    }
-    else if v.x < 0. {
+    } else if v.x < 0. {
         if p.x <= min.x {
             return None;
         }
@@ -55,15 +53,11 @@ fn project(p: &Point, v: &Point, min: &Point, max: &Point) -> Option<Point> {
         }
     }
 
-    Some(Point{
-        x: x,
-        y: y
-    })
+    Some(Point { x, y })
 }
 
 fn clockwise(p0: &Point, p1: &Point, p2: &Point) -> bool {
-    (p1.x - p0.x) * (p2.y - p0.y) <
-    (p1.y - p0.y) * (p2.x - p0.x)
+    (p1.x - p0.x) * (p2.y - p0.y) < (p1.y - p0.y) * (p2.x - p0.x)
 }
 
 fn contains(points: &[Point], v0: &Point, vn: &Point, p: &Point) -> bool {
@@ -71,7 +65,14 @@ fn contains(points: &[Point], v0: &Point, vn: &Point, p: &Point) -> bool {
     let mut p0: &Point;
     let mut p1 = &points[0];
 
-    if clockwise(p, &Point{x: p1.x + v0.x, y: p1.y + v0.y}, &p1) {
+    if clockwise(
+        p,
+        &Point {
+            x: p1.x + v0.x,
+            y: p1.y + v0.y,
+        },
+        &p1,
+    ) {
         return false;
     }
 
@@ -83,11 +84,18 @@ fn contains(points: &[Point], v0: &Point, vn: &Point, p: &Point) -> bool {
         }
     }
 
-    if clockwise(p, &p1, &Point{x: p1.x + vn.x, y: p1.y + vn.y}) {
+    if clockwise(
+        p,
+        &p1,
+        &Point {
+            x: p1.x + vn.x,
+            y: p1.y + vn.y,
+        },
+    ) {
         return false;
     }
 
-    return true;
+    true
 }
 
 fn sidecode(p: &Point, min: &Point, max: &Point) -> usize {
@@ -113,6 +121,7 @@ fn sidecode(p: &Point, min: &Point, max: &Point) -> usize {
 type InsideFunc = dyn Fn(&Point, &Point, &Point) -> bool;
 type IntersectFunc = dyn Fn(&Point, &Point, &Point, &Point) -> Point;
 
+#[rustfmt::skip]
 fn inside(name: &str) -> &InsideFunc {
     match name {
         "top" =>    &|p: &Point, min: &Point,   _: &Point| { p.y > min.y },
@@ -123,6 +132,7 @@ fn inside(name: &str) -> &InsideFunc {
     }
 }
 
+#[rustfmt::skip]
 fn intersect(name: &str) -> &IntersectFunc {
     match name {
         "top" =>    &|p0: &Point, p1: &Point, min: &Point,   _: &Point| { Point{x: p0.x + (p1.x - p0.x) * (min.y - p0.y) / (p1.y - p0.y), y: min.y}},
@@ -133,18 +143,22 @@ fn intersect(name: &str) -> &IntersectFunc {
     }
 }
 
-fn clipper(inside_fn: &str,
-           intersect_fn: &str, 
-           min: &Point, max: &Point, points: &[Point]) -> Vec<Point> { 
+fn clipper(
+    inside_fn: &str,
+    intersect_fn: &str,
+    min: &Point,
+    max: &Point,
+    points: &[Point],
+) -> Vec<Point> {
     let n = points.len();
     let mut p: Vec<Point> = vec![];
-    
+
     if n == 0 {
         return p;
     }
 
     let mut p0: &Point;
-    let mut p1 = &points[n-1];
+    let mut p1 = &points[n - 1];
     let mut t0: bool;
     let mut t1 = inside(inside_fn)(&p1, &min, &max);
     for i in 0..n {
@@ -170,7 +184,14 @@ pub fn clip_finite(points: &[Point], min: &Point, max: &Point) -> Vec<Point> {
     res
 }
 
-pub fn clip_infinite(points: &[Point], v0: &Point, vn: &Point, min: &Point, max: &Point) -> Vec<Point> {
+#[rustfmt::skip]
+pub fn clip_infinite(
+    points: &[Point],
+    v0: &Point,
+    vn: &Point,
+    min: &Point,
+    max: &Point,
+) -> Vec<Point> {
     let mut clipped = points.clone().to_vec();
     let mut n: usize;
 
@@ -179,9 +200,9 @@ pub fn clip_infinite(points: &[Point], v0: &Point, vn: &Point, min: &Point, max:
         clipped.insert(0, p.unwrap());
     }
 
-    let p = project(&clipped[clipped.len()-1], vn, min, max);
-    if p.is_some() {
-        clipped.insert(0, p.unwrap());
+    let p = project(&clipped[clipped.len() - 1], vn, min, max);
+    if let Some(p) = p {
+        clipped.insert(0, p);
     }
 
     clipped = clip_finite(&clipped, min, max);
@@ -189,7 +210,7 @@ pub fn clip_infinite(points: &[Point], v0: &Point, vn: &Point, min: &Point, max:
 
     if n > 0 {
         let mut c0: usize;
-        let mut c1 = sidecode(&clipped[n-1], min, max);
+        let mut c1 = sidecode(&clipped[n - 1], min, max);
         let mut i = 0;
         while i < n {
             c0 = c1;
@@ -208,7 +229,8 @@ pub fn clip_infinite(points: &[Point], v0: &Point, vn: &Point, min: &Point, max:
                         0b0001 => { c0 = 0b0101; c = Point{x: min.x, y: min.y}; } // left
                         _      => { panic!("this should never be reachable")}
                     }
-                    if (clipped[i].x != c.x || clipped[i].y != c.y) && contains(points, v0, vn, &c) {
+                    if (clipped[i].x != c.x || clipped[i].y != c.y) && contains(points, v0, vn, &c)
+                    {
                         clipped.insert(i, c);
                         i += 1;
                     }
@@ -217,8 +239,21 @@ pub fn clip_infinite(points: &[Point], v0: &Point, vn: &Point, min: &Point, max:
             n = clipped.len();
             i += 1;
         }
-    } else if contains(points, v0, vn, &Point{x: (min.x + max.x) / 2.0, y: (min.y + max.y) / 2.0}) {
-        let mut end = vec![min.clone(), Point{x: max.x, y: min.y}, max.clone(), Point{x: min.x, y: max.y}];
+    } else if contains(
+        points,
+        v0,
+        vn,
+        &Point {
+            x: (min.x + max.x) / 2.0,
+            y: (min.y + max.y) / 2.0,
+        },
+    ) {
+        let mut end = vec![
+            min.clone(),
+            Point { x: max.x, y: min.y },
+            max.clone(),
+            Point { x: min.x, y: max.y },
+        ];
         clipped.append(&mut end);
     }
 

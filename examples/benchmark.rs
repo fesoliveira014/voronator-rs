@@ -1,12 +1,12 @@
 extern crate voronator;
 
-use rand::Rng;
 use rand::distributions::Uniform;
+use rand::Rng;
 use rand_distr::StandardNormal;
-use voronator::delaunator as delaunator;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
+use voronator::delaunator;
 
-use std::f64 as f64;
+use std::f64;
 
 fn report(n: usize, elapsed: Duration, t: &delaunator::Triangulation) {
     println!(
@@ -26,7 +26,12 @@ fn uniform(count: &[usize]) {
     println!("Uniform distribution:");
 
     for c in count {
-        let points: Vec<delaunator::Point> = (0..*c).map(|_| delaunator::Point {x: rng.sample(&range), y: rng.sample(&range)}).collect();
+        let points: Vec<delaunator::Point> = (0..*c)
+            .map(|_| delaunator::Point {
+                x: rng.sample(&range),
+                y: rng.sample(&range),
+            })
+            .collect();
 
         let now = Instant::now();
         let t = delaunator::triangulate(&points).expect("No triangulation exists for this input.");
@@ -38,12 +43,15 @@ fn uniform(count: &[usize]) {
 
 fn gaussian(count: &[usize]) {
     let mut rng = rand::thread_rng();
-    
+
     println!("Gaussian distribution:");
 
     for c in count {
         let points: Vec<delaunator::Point> = (0..*c)
-            .map(|_| delaunator::Point {x: rng.sample::<f64,StandardNormal>(StandardNormal) * 1000., y: rng.sample::<f64,StandardNormal>(StandardNormal) * 1000.})
+            .map(|_| delaunator::Point {
+                x: rng.sample::<f64, StandardNormal>(StandardNormal) * 1000.,
+                y: rng.sample::<f64, StandardNormal>(StandardNormal) * 1000.,
+            })
             .collect();
 
         let now = Instant::now();
@@ -60,10 +68,13 @@ fn grid(count: &[usize]) {
     for c in count {
         let size = (*c as f64).sqrt().floor() as usize;
         let mut points: Vec<delaunator::Point> = vec![];
-        
+
         for i in 0..size {
             for j in 0..size {
-                points.push(delaunator::Point{x: i as f64, y: j as f64});
+                points.push(delaunator::Point {
+                    x: i as f64,
+                    y: j as f64,
+                });
             }
         }
 
@@ -79,10 +90,13 @@ fn degenerate(count: &[usize]) {
     println!("Degenerate distribution:");
 
     for c in count {
-        let mut points: Vec<delaunator::Point> = vec![delaunator::Point{x: 0., y: 0.}];
+        let mut points: Vec<delaunator::Point> = vec![delaunator::Point { x: 0., y: 0. }];
         for i in 0..*c {
             let angle = 2. * f64::consts::PI * (i as f64) / (*c as f64);
-            points.push(delaunator::Point{x: 1e10 * angle.sin(), y: 1e10 * angle.cos()});
+            points.push(delaunator::Point {
+                x: 1e10 * angle.sin(),
+                y: 1e10 * angle.cos(),
+            });
         }
 
         let now = Instant::now();
