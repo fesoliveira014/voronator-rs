@@ -99,17 +99,17 @@ fn contains(points: &[Point], v0: &Point, vn: &Point, p: &Point) -> bool {
 }
 
 fn sidecode(p: &Point, min: &Point, max: &Point) -> usize {
-    let part1 = if p.x == min.x {
+    let part1 = if (p.x - min.x).abs() < std::f64::EPSILON {
         1
-    } else if p.x == max.x {
+    } else if (p.x - max.x).abs() < std::f64::EPSILON {
         2
     } else {
         0
     };
 
-    let part2 = if p.y == min.y {
+    let part2 = if (p.y - min.y).abs() < std::f64::EPSILON {
         4
-    } else if p.y == max.y {
+    } else if (p.y - max.y).abs() < std::f64::EPSILON {
         8
     } else {
         0
@@ -193,7 +193,7 @@ pub fn clip_infinite(
     min: &Point,
     max: &Point,
 ) -> Vec<Point> {
-    let mut clipped = points.clone().to_vec();
+    let mut clipped = points.to_vec();
     let mut n: usize;
 
     let p = project(&clipped[0], v0, min, max);
@@ -230,7 +230,7 @@ pub fn clip_infinite(
                         0b0001 => { c0 = 0b0101; c = Point{x: min.x, y: min.y}; } // left
                         _      => { panic!("this should never be reachable")}
                     }
-                    if (clipped[i].x != c.x || clipped[i].y != c.y) && contains(points, v0, vn, &c)
+                    if ( (clipped[i].x - c.x).abs() > std::f64::EPSILON || (clipped[i].y - c.y).abs() > std::f64::EPSILON) && contains(points, v0, vn, &c)
                     {
                         clipped.insert(i, c);
                         i += 1;
