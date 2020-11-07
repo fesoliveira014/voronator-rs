@@ -83,7 +83,6 @@ mod clip;
 pub mod delaunator;
 
 use std::{f64, usize};
-use vec;
 
 use crate::clip::{clip_finite, clip_infinite};
 use crate::delaunator::*;
@@ -115,10 +114,10 @@ impl CentroidDiagram {
         let neighbors = calculate_neighbors(points, &delaunay);
         Some(CentroidDiagram {
             sites: points.to_vec(),
-            delaunay: delaunay,
-            centers: centers,
-            cells: cells,
-            neighbors: neighbors,
+            delaunay,
+            centers,
+            cells,
+            neighbors,
         })
     }
 
@@ -126,10 +125,7 @@ impl CentroidDiagram {
     ///
     /// Points are represented here as a `(f64, f64)` tuple.
     pub fn from_tuple(coords: &[(f64, f64)]) -> Option<Self> {
-        let points: Vec<Point> = coords
-            .into_iter()
-            .map(|p| Point { x: p.0, y: p.1 })
-            .collect();
+        let points: Vec<Point> = coords.iter().map(|p| Point { x: p.0, y: p.1 }).collect();
         CentroidDiagram::new(&points)
     }
 
@@ -183,10 +179,10 @@ impl VoronoiDiagram {
         let neighbors = calculate_neighbors(points, &delaunay);
         Some(VoronoiDiagram {
             sites: points.to_vec(),
-            delaunay: delaunay,
-            centers: centers,
-            cells: cells,
-            neighbors: neighbors,
+            delaunay,
+            centers,
+            cells,
+            neighbors,
         })
     }
 
@@ -194,10 +190,7 @@ impl VoronoiDiagram {
     ///
     /// Points are represented here as a `(f64, f64)` tuple.
     pub fn from_tuple(min: &(f64, f64), max: &(f64, f64), coords: &[(f64, f64)]) -> Option<Self> {
-        let points: Vec<Point> = coords
-            .into_iter()
-            .map(|p| Point { x: p.0, y: p.1 })
-            .collect();
+        let points: Vec<Point> = coords.iter().map(|p| Point { x: p.0, y: p.1 }).collect();
         let min = Point { x: min.0, y: min.1 };
         let max = Point { x: max.0, y: max.1 };
         VoronoiDiagram::new(&min, &max, &points)
@@ -257,7 +250,7 @@ impl VoronoiDiagram {
                 clip_finite(&polygon, min, max)
             };
 
-            if vertices.len() == 0 {
+            if vertices.is_empty() {
                 continue;
             }
 

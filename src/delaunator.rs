@@ -683,9 +683,7 @@ fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize,
         let p2 = &points[i2];
 
         if counter_clockwise(&p0, &p1, &p2) {
-            let temp = i1;
-            i1 = i2;
-            i2 = temp;
+            std::mem::swap(&mut i1, &mut i2)
         }
 
         Some((i0, i1, i2))

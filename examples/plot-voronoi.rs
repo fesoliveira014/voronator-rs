@@ -27,8 +27,6 @@ fn get_points(n: i32, jitter: f64) -> Vec<Point> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut rng = rand::thread_rng();
-
     let size = 10;
     let points: Vec<Point> = get_points(size, 0.6)
         .into_iter()

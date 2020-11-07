@@ -185,6 +185,7 @@ pub fn clip_finite(points: &[Point], min: &Point, max: &Point) -> Vec<Point> {
 }
 
 #[rustfmt::skip]
+
 pub fn clip_infinite(
     points: &[Point],
     v0: &Point,
