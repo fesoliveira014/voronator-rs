@@ -60,6 +60,7 @@ fn clockwise(p0: &Point, p1: &Point, p2: &Point) -> bool {
     (p1.x - p0.x) * (p2.y - p0.y) < (p1.y - p0.y) * (p2.x - p0.x)
 }
 
+#[allow(clippy::needless_range_loop)]
 fn contains(points: &[Point], v0: &Point, vn: &Point, p: &Point) -> bool {
     let n = points.len();
     let mut p0: &Point;
@@ -143,6 +144,7 @@ fn intersect(name: &str) -> &IntersectFunc {
     }
 }
 
+#[allow(clippy::needless_range_loop)]
 fn clipper(
     inside_fn: &str,
     intersect_fn: &str,
@@ -196,9 +198,8 @@ pub fn clip_infinite(
     let mut clipped = points.to_vec();
     let mut n: usize;
 
-    let p = project(&clipped[0], v0, min, max);
-    if p.is_some() {
-        clipped.insert(0, p.unwrap());
+    if let Some(p) = project(&clipped[0], v0, min, max){
+        clipped.insert(0, p);
     }
 
     let p = project(&clipped[clipped.len() - 1], vn, min, max);

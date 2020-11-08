@@ -282,18 +282,17 @@ fn calculate_centroids(points: &[Point], delaunay: &Triangulation) -> Vec<Point>
 
 fn calculate_circumcenters(points: &[Point], delaunay: &Triangulation) -> Vec<Point> {
     let num_triangles = delaunay.len();
-    let mut circumceters = vec![Point { x: 0., y: 0. }; num_triangles];
+    let mut circumcenters = vec![Point { x: 0., y: 0. }; num_triangles];
     for t in 0..num_triangles {
         let v: Vec<Point> = points_of_triangle(t, delaunay)
             .into_iter()
             .map(|p| points[p].clone())
             .collect();
-        let c = circumcenter(&v[0], &v[1], &v[2]);
-        if c.is_some() {
-            circumceters[t] = c.unwrap();
+        if let Some(c) = circumcenter(&v[0], &v[1], &v[2]) {
+            circumcenters[t] = c;
         }
     }
-    circumceters
+    circumcenters
 }
 
 fn calculate_neighbors(points: &[Point], delaunay: &Triangulation) -> Vec<Vec<usize>> {
