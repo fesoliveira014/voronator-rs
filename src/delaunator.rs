@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 #![warn(missing_doc_code_examples)]
 //! Implements the Delaunay triangulation algorithm.
-//! 
+//!
 //! This module was ported from the original [Delaunator](https://github.com/mapbox/delaunator), by Mapbox. If a triangulation is possible a given set of points in the 2D space, it returns a [`Triangulation`] structure. This structure contains three main components: [`triangles`], [`halfedges`] and [`hull`]:
 //! ```ignore
 //! let coords = vec![(0., 0.), (1., 0.), (1., 1.), (0., 1.)];
@@ -21,41 +21,40 @@
 //! ```
 //! - `halfedges`:  `Vec<usize>` array of triangle half-edge indices that allows you to traverse the triangulation. i-th half-edge in the array corresponds to vertex `triangles[i]` the half-edge is coming from. `halfedges[i]` is the index of a twin half-edge in an adjacent triangle (or `INVALID_INDEX` for outer half-edges on the convex hull). The flat array-based data structures might be counterintuitive, but they're one of the key reasons this library is fast.
 //! - `hull`: A `Vec<usize>` array of indices that reference points on the convex hull of the input data, counter-clockwise.
-//! 
+//!
 //! The last two components, `inedges` and `outedges`, are for voronator internal use only.
-//! 
+//!
 //! # Example
-//! 
+//!
 //! ```no_run
 //! extern crate voronator;
-//! 
+//!
 //! use voronator::delaunator::{triangulate_from_tuple};
-//! 
+//!
 //! fn main() {
 //!     let points = vec![(0., 0.), (1., 0.), (1., 1.), (0., 1.)];
-//!     
+//!
 //!     let (t, _) = triangulate_from_tuple(&points)
 //!         .expect("No triangulation exists for this input.");
-//! 
+//!
 //!     for i in 0..t.len() {
 //!         let i0 = t.triangles[3*i];
 //!         let i1 = t.triangles[3*i + 1];
 //!         let i2 = t.triangles[3*i + 2];
-//! 
+//!
 //!         let p = vec![points[i0], points[i1], points[i2]];
-//! 
+//!
 //!         println!("triangle {}: {:?}", i, p);
 //!     }
 //! }
 //! ```
-//! 
+//!
 //! [`Triangulation`]: ./struct.Triangulation.html
 //! [`triangles`]: ./struct.Triangulation.html#structfield.triangles
 //! [`halfedges`]: ./struct.Triangulation.html#structfield.halfedges
 //! [`hull`]: ./struct.Triangulation.html#structfield.hull
 
-use std::{f64, usize, fmt};
-use vec;
+use std::{f64, fmt, usize};
 
 /// Defines a comparison epsilon used for floating-point comparissons
 pub const EPSILON: f64 = f64::EPSILON * 2.0;
@@ -64,12 +63,12 @@ pub const EPSILON: f64 = f64::EPSILON * 2.0;
 pub const INVALID_INDEX: usize = usize::max_value();
 
 #[derive(Clone, PartialEq)]
-/// Represents a point in the 2D space. 
+/// Represents a point in the 2D space.
 pub struct Point {
     /// X coordinate of the point
     pub x: f64,
     /// Y coordinate of the point
-    pub y: f64
+    pub y: f64,
 }
 
 impl fmt::Debug for Point {
@@ -82,7 +81,7 @@ impl Point {
     fn vector(p: &Self, q: &Self) -> Self {
         Self {
             x: q.x - p.x,
-            y: q.y - p.y
+            y: q.y - p.y,
         }
     }
 
@@ -111,10 +110,12 @@ impl Point {
 
 impl From<(f64, f64)> for Point {
     fn from(item: (f64, f64)) -> Self {
-        Point{x: item.0, y: item.1}
+        Point {
+            x: item.0,
+            y: item.1,
+        }
     }
 }
-
 
 fn in_circle(p: &Point, a: &Point, b: &Point, c: &Point) -> bool {
     let d = Point::vector(p, a);
@@ -125,14 +126,16 @@ fn in_circle(p: &Point, a: &Point, b: &Point, c: &Point) -> bool {
     let bp = e.x * e.x + e.y * e.y;
     let cp = f.x * f.x + f.y * f.y;
 
+    #[rustfmt::skip]
     let res = d.x * (e.y * cp  - bp  * f.y) -
                    d.y * (e.x * cp  - bp  * f.x) +
                    ap  * (e.x * f.y - e.y * f.x) ;
-     
-     res < 0.0
+
+    res < 0.0
 }
 
-fn circumradius(a: &Point, b: &Point, c: &Point) -> f64{
+#[rustfmt::skip]
+fn circumradius(a: &Point, b: &Point, c: &Point) -> f64 {
     let d = Point::vector(a, b);
     let e = Point::vector(a, c);
 
@@ -153,12 +156,13 @@ fn circumradius(a: &Point, b: &Point, c: &Point) -> f64{
 }
 
 /// Calculates the circumcenter of a triangle, given it's three vertices
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `a` - The first vertex of the triangle
 /// * `b` - The second vertex of the triangle
 /// * `c` - The third vertex of the triangle
+#[rustfmt::skip]
 pub fn circumcenter(a: &Point, b: &Point, c: &Point) -> Option<Point> {
     let d = Point::vector(a, b);
     let e = Point::vector(a, c);
@@ -175,7 +179,7 @@ pub fn circumcenter(a: &Point, b: &Point, c: &Point) -> Option<Point> {
        (det > 0.0 || det < 0.0) {
         Some(Point {
             x: a.x + x,
-            y: a.y + y
+            y: a.y + y,
         })
     } else {
         None
@@ -202,9 +206,9 @@ fn counter_clockwise(p0: &Point, p1: &Point, p2: &Point) -> bool {
 }
 
 /// Returs the next halfedge for a given halfedge
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `i` - The current halfedge index
 pub fn next_halfedge(i: usize) -> usize {
     if i % 3 == 2 {
@@ -215,9 +219,9 @@ pub fn next_halfedge(i: usize) -> usize {
 }
 
 /// Returs the previous halfedge for a given halfedge
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `i` - The current halfedge index
 pub fn prev_halfedge(i: usize) -> usize {
     if i % 3 == 0 {
@@ -228,27 +232,27 @@ pub fn prev_halfedge(i: usize) -> usize {
 }
 
 /// Returns a vec containing indices for the 3 edges of a triangle t
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `t` - The triangle index
 pub fn edges_of_triangle(t: usize) -> [usize; 3] {
-    [3*t, 3*t + 1, 3*t + 2]
+    [3 * t, 3 * t + 1, 3 * t + 2]
 }
 
 /// Returns the triangle associated with the given edge
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `e` - The edge index
 pub fn triangle_of_edge(e: usize) -> usize {
     ((e as f64) / 3.).floor() as usize
 }
 
 /// Returns a vec containing the indices of the corners of the given triangle
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `t` - The triangle index
 /// * `delaunay` - A reference to a fully constructed Triangulation
 pub fn points_of_triangle(t: usize, delaunay: &Triangulation) -> Vec<usize> {
@@ -257,9 +261,9 @@ pub fn points_of_triangle(t: usize, delaunay: &Triangulation) -> Vec<usize> {
 }
 
 /// Returns a vec containing the indices for the adjacent triangles of the given triangle
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `t` - The triangle index
 /// * `delaunay` - A reference to a fully constructed Triangulation
 pub fn triangles_adjacent_to_triangle(t: usize, delaunay: &Triangulation) -> Vec<usize> {
@@ -274,9 +278,9 @@ pub fn triangles_adjacent_to_triangle(t: usize, delaunay: &Triangulation) -> Vec
 }
 
 /// Returns a vec containing all edges around a point
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `start` - The start point index
 /// * `delaunay` - A reference to a fully constructed Triangulation
 pub fn edges_around_point(start: usize, delaunay: &Triangulation) -> Vec<usize> {
@@ -294,7 +298,7 @@ pub fn edges_around_point(start: usize, delaunay: &Triangulation) -> Vec<usize> 
 }
 
 /// Represents a Delaunay triangulation for a given set of points. See example in [`delaunator`] for usage details.
-/// 
+///
 /// [`delaunator`]: ./index.html#example
 
 pub struct Triangulation {
@@ -305,11 +309,11 @@ pub struct Triangulation {
     /// A `Vec<usize>` array of indices that reference points on the convex hull of the input data, counter-clockwise.
     pub hull: Vec<usize>,
     /// A `Vec<usize>` that contains indices for halfedges of points in the hull that points inwards to the diagram. Only for [`voronator`] internal use.
-    /// 
+    ///
     /// [`voronator`]: ../index.html
     pub inedges: Vec<usize>,
     /// A `Vec<usize>` that contains indices for halfedges of points in the hull that points outwards to the diagram. Only for [`voronator`] internal use.
-    /// 
+    ///
     /// [`voronator`]: ../index.html
     pub outedges: Vec<usize>,
 }
@@ -333,26 +337,26 @@ impl Triangulation {
 
     fn legalize(&mut self, p: usize, points: &[Point], hull: &mut Hull) -> usize {
         /* if the pair of triangles doesn't satisfy the Delaunay condition
-        * (p1 is inside the circumcircle of [p0, pl, pr]), flip them,
-        * then do the same check/flip recursively for the new pair of triangles
-        *
-        *           pl                    pl
-        *          /||\                  /  \
-        *       al/ || \bl            al/    \a
-        *        /  ||  \              /      \
-        *       /  a||b  \    flip    /___ar___\
-        *     p0\   ||   /p1   =>   p0\---bl---/p1
-        *        \  ||  /              \      /
-        *       ar\ || /br             b\    /br
-        *          \||/                  \  /
-        *           pr                    pr
-        */
+         * (p1 is inside the circumcircle of [p0, pl, pr]), flip them,
+         * then do the same check/flip recursively for the new pair of triangles
+         *
+         *           pl                    pl
+         *          /||\                  /  \
+         *       al/ || \bl            al/    \a
+         *        /  ||  \              /      \
+         *       /  a||b  \    flip    /___ar___\
+         *     p0\   ||   /p1   =>   p0\---bl---/p1
+         *        \  ||  /              \      /
+         *       ar\ || /br             b\    /br
+         *          \||/                  \  /
+         *           pr                    pr
+         */
         let mut i: usize = 0;
         let mut ar;
         let mut a = p;
 
         let mut edge_stack: Vec<usize> = Vec::new();
-        
+
         loop {
             let b = self.halfedges[a];
             ar = prev_halfedge(a);
@@ -363,28 +367,25 @@ impl Triangulation {
                     a = edge_stack[i];
                     continue;
                 } else {
-                    break
+                    break;
                 }
             }
 
             let al = next_halfedge(a);
             let bl = prev_halfedge(b);
-            
+
             let p0 = self.triangles[ar];
             let pr = self.triangles[a];
             let pl = self.triangles[al];
             let p1 = self.triangles[bl];
 
-            let illegal = in_circle(&points[p1], 
-                                    &points[p0], 
-                                    &points[pr], 
-                                    &points[pl]);
+            let illegal = in_circle(&points[p1], &points[p0], &points[pr], &points[pl]);
             if illegal {
                 self.triangles[a] = p1;
                 self.triangles[b] = p0;
 
                 let hbl = self.halfedges[bl];
-                
+
                 // Edge swapped on the other side of the hull (rare).
                 // Fix the halfedge reference
                 if hbl == INVALID_INDEX {
@@ -394,9 +395,9 @@ impl Triangulation {
                             hull.tri[e] = a;
                             break;
                         }
-                        
+
                         e = hull.prev[e];
-                        
+
                         if e == hull.start {
                             break;
                         }
@@ -416,14 +417,12 @@ impl Triangulation {
                 }
 
                 i += 1;
+            } else if i > 0 {
+                i -= 1;
+                a = edge_stack[i];
+                continue;
             } else {
-                if i > 0 {
-                    i -= 1;
-                    a = edge_stack[i];
-                    continue;
-                } else {
-                    break;
-                }
+                break;
             }
         }
 
@@ -440,7 +439,6 @@ impl Triangulation {
         } else {
             // todo: fix hard error, make it recoverable or graceful
             panic!("Cannot link edge")
-
         }
 
         if b != INVALID_INDEX {
@@ -456,13 +454,15 @@ impl Triangulation {
         }
     }
 
-    fn add_triangle(&mut self, 
-                    i0: usize, 
-                    i1: usize, 
-                    i2: usize, 
-                    a: usize, 
-                    b: usize, 
-                    c: usize) -> usize {
+    fn add_triangle(
+        &mut self,
+        i0: usize,
+        i1: usize,
+        i2: usize,
+        a: usize,
+        b: usize,
+        c: usize,
+    ) -> usize {
         let t: usize = self.triangles.len();
 
         // eprintln!("adding triangle [{}, {}, {}]", i0, i1, i2);
@@ -480,7 +480,7 @@ impl Triangulation {
 }
 
 //@see https://stackoverflow.com/questions/33333363/built-in-mod-vs-custom-mod-function-improve-the-performance-of-modulus-op/33333636#33333636
-fn fast_mod(i: usize, c: usize) -> usize{
+fn fast_mod(i: usize, c: usize) -> usize {
     if i >= c {
         i % c
     } else {
@@ -488,7 +488,7 @@ fn fast_mod(i: usize, c: usize) -> usize{
     }
 }
 
-// monotonically increases with real angle, 
+// monotonically increases with real angle,
 // but doesn't need expensive trigonometry
 fn pseudo_angle(d: &Point) -> f64 {
     let p = d.x / (d.x.abs() + d.y.abs());
@@ -505,7 +505,7 @@ struct Hull {
     tri: Vec<usize>,
     hash: Vec<usize>,
     start: usize,
-    center: Point
+    center: Point,
 }
 
 impl Hull {
@@ -534,7 +534,7 @@ impl Hull {
         hull.tri[i2] = 2;
 
         // todo here
-        
+
         hull.hash_edge(&points[i0], i0);
         hull.hash_edge(&points[i1], i1);
         hull.hash_edge(&points[i2], i2);
@@ -544,10 +544,10 @@ impl Hull {
 
     fn hash_key(&self, p: &Point) -> usize {
         let d = Point::vector(&self.center, p);
-        
+
         let angle: f64 = pseudo_angle(&d);
         let len = self.hash.len();
-        
+
         fast_mod((angle * (len as f64)).floor() as usize, len)
     }
 
@@ -585,8 +585,8 @@ impl Hull {
         loop {
             q = self.next[e];
             // eprintln!("p: {:?}, e: {:?}, q: {:?}", p, &points[e], &points[q]);
-            if Point::equals_with_span(p, &points[e], span) ||
-               Point::equals_with_span(p, &points[q], span) 
+            if Point::equals_with_span(p, &points[e], span)
+                || Point::equals_with_span(p, &points[q], span)
             {
                 e = INVALID_INDEX;
                 break;
@@ -606,8 +606,14 @@ impl Hull {
 }
 
 fn calculate_bbox_center(points: &[Point]) -> (Point, f64) {
-    let mut max = Point{x: f64::NEG_INFINITY, y: f64::NEG_INFINITY};
-    let mut min = Point{x: f64::INFINITY, y: f64::INFINITY };
+    let mut max = Point {
+        x: f64::NEG_INFINITY,
+        y: f64::NEG_INFINITY,
+    };
+    let mut min = Point {
+        x: f64::INFINITY,
+        y: f64::INFINITY,
+    };
 
     for point in points {
         min.x = min.x.min(point.x);
@@ -620,11 +626,13 @@ fn calculate_bbox_center(points: &[Point]) -> (Point, f64) {
     let height = max.y - min.y;
     let span = width * width + height * height;
 
-    (Point {
-        x: (min.x + max.x) / 2.0,
-        y: (min.y + max.y) / 2.0
-    },
-    span)
+    (
+        Point {
+            x: (min.x + max.x) / 2.0,
+            y: (min.y + max.y) / 2.0,
+        },
+        span,
+    )
 }
 
 fn find_closest_point(points: &[Point], p: &Point) -> usize {
@@ -635,7 +643,7 @@ fn find_closest_point(points: &[Point], p: &Point) -> usize {
         if i != k {
             let q = &points[i];
             let d = Point::dist2(&p, &q);
-            
+
             if d < min_dist && d > 0.0 {
                 k = i;
                 min_dist = d;
@@ -646,13 +654,13 @@ fn find_closest_point(points: &[Point], p: &Point) -> usize {
     k
 }
 
-fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize, usize)> {      
+fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize, usize)> {
     let i0 = find_closest_point(points, center);
     let p0 = &points[i0];
-    
+
     let mut i1 = find_closest_point(points, &p0);
     let p1 = &points[i1];
-    
+
     // find the third point which forms the smallest circumcircle
     // with the first two
     let mut min_radius = f64::MAX;
@@ -661,7 +669,7 @@ fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize,
         if i != i0 && i != i1 {
             let p = &points[i];
             let r = circumradius(&p0, &p1, &p);
-            
+
             if r < min_radius {
                 i2 = i;
                 min_radius = r;
@@ -672,13 +680,10 @@ fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize,
     if min_radius == f64::MAX {
         None
     } else {
-
         let p2 = &points[i2];
 
         if counter_clockwise(&p0, &p1, &p2) {
-            let temp = i1;
-            i1 = i2;
-            i2 = temp;
+            std::mem::swap(&mut i1, &mut i2)
         }
 
         Some((i0, i1, i2))
@@ -693,7 +698,10 @@ fn to_points(coords: &[f64]) -> Vec<Point> {
         if i == coords.len() {
             break;
         }
-        let p = Point{x: coords[i], y: coords[i+1]};
+        let p = Point {
+            x: coords[i],
+            y: coords[i + 1],
+        };
         points.push(p);
         i += 2;
     }
@@ -701,55 +709,53 @@ fn to_points(coords: &[f64]) -> Vec<Point> {
     points
 }
 
-/// Calculates the Delaunay triangulation, if it exists, for a given set of 2D 
-/// points. 
-/// 
+/// Calculates the Delaunay triangulation, if it exists, for a given set of 2D
+/// points.
+///
 /// Points are passed a flat array of `f64` of size `2n`, where n is the
-/// number of points and for each point `i`, `{x = 2i, y = 2i + 1}` and 
-/// converted internally to `delaunator::Point`. It returns both the triangulation 
-/// and the vector of `delaunator::Point` to be used, if desired. 
-/// 
+/// number of points and for each point `i`, `{x = 2i, y = 2i + 1}` and
+/// converted internally to `delaunator::Point`. It returns both the triangulation
+/// and the vector of `delaunator::Point` to be used, if desired.
+///
 /// # Arguments
-/// 
-/// * `coords` - A vector of `f64` of size `2n`, where for each point `i`, `x = 2i` 
-/// and y = `2i + 1`. 
+///
+/// * `coords` - A vector of `f64` of size `2n`, where for each point `i`, `x = 2i`
+/// and y = `2i + 1`.
 pub fn triangulate_from_arr(coords: &[f64]) -> Option<(Triangulation, Vec<Point>)> {
     let n = coords.len();
-    
+
     if n % 2 != 0 {
-        return None
+        return None;
     }
-    
+
     let points = to_points(coords);
     let triangulation = triangulate(&points)?;
 
     Some((triangulation, points))
 }
 
-/// Calculates the Delaunay triangulation, if it exists, for a given set of 2D 
-/// points. 
-/// 
+/// Calculates the Delaunay triangulation, if it exists, for a given set of 2D
+/// points.
+///
 /// Points are passed as a tuple, `(f64, f64)`, and converted internally
-/// to `delaunator::Point`. It returns both the triangulation and the vector of 
-/// Points to be used, if desired. 
-/// 
+/// to `delaunator::Point`. It returns both the triangulation and the vector of
+/// Points to be used, if desired.
+///
 /// # Arguments
-/// 
+///
 /// * `coords` - A vector of tuples, where each tuple is a `(f64, f64)`
 pub fn triangulate_from_tuple(coords: &[(f64, f64)]) -> Option<(Triangulation, Vec<Point>)> {
-    let points: Vec<Point> = coords.iter()
-        .map(|p| Point { x: p.0, y: p.1 })
-        .collect();
-    
+    let points: Vec<Point> = coords.iter().map(|p| Point { x: p.0, y: p.1 }).collect();
+
     let triangulation = triangulate(&points)?;
 
     Some((triangulation, points))
 }
 
 /// Calculates the Delaunay triangulation, if it exists, for a given set of 2D points
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `points` - The set of points
 pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
     if points.len() < 3 {
@@ -761,7 +767,7 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
     //eprintln!("calculating bbox and seeds...");
     let (center_bbox, span) = calculate_bbox_center(points);
     let (i0, i1, i2) = find_seed_triangle(&center_bbox, &points)?;
-    
+
     let p0 = &points[i0];
     let p1 = &points[i1];
     let p2 = &points[i2];
@@ -769,7 +775,7 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
     let center = circumcenter(&p0, &p1, &p2).unwrap();
 
     //eprintln!("calculating dists...");
-    
+
     // Calculate the distances from the center once to avoid having to
     // calculate for each compare.
     let mut dists: Vec<(usize, f64)> = points
@@ -780,16 +786,18 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
 
     // sort the points by distance from the seed triangle circumcenter
     dists.sort_unstable_by(|(_, a), (_, b)| a.partial_cmp(&b).unwrap());
-    
+
     //eprintln!("creating hull...");
     let mut hull = Hull::new(points.len(), &center, i0, i1, i2, points);
 
     //eprintln!("calculating triangulation...");
     let mut triangulation = Triangulation::new(points.len());
-    triangulation.add_triangle(i0, i1, i2, 
-        INVALID_INDEX, INVALID_INDEX, INVALID_INDEX);
+    triangulation.add_triangle(i0, i1, i2, INVALID_INDEX, INVALID_INDEX, INVALID_INDEX);
 
-    let mut pp = Point{x: f64::NAN, y: f64::NAN};
+    let mut pp = Point {
+        x: f64::NAN,
+        y: f64::NAN,
+    };
 
     //eprintln!("iterating points...");
     // go through points based on distance from the center.
@@ -814,13 +822,17 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
             continue;
         }
 
-        // add the first triangle from the point        
+        // add the first triangle from the point
         // eprintln!("first triangle of iteration");
         let mut t = triangulation.add_triangle(
-            e, i, hull.next[e], 
-            INVALID_INDEX, INVALID_INDEX, hull.tri[e]
+            e,
+            i,
+            hull.next[e],
+            INVALID_INDEX,
+            INVALID_INDEX,
+            hull.tri[e],
         );
-        
+
         hull.tri[i] = triangulation.legalize(t + 2, points, &mut hull);
         hull.tri[e] = t;
 
@@ -833,16 +845,15 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
             if !counter_clockwise(p, &points[next], &points[q]) {
                 break;
             }
-            t = triangulation.add_triangle(next, i, q, hull.tri[i], 
-                INVALID_INDEX, hull.tri[next]);
-            
+            t = triangulation.add_triangle(next, i, q, hull.tri[i], INVALID_INDEX, hull.tri[next]);
+
             hull.tri[i] = triangulation.legalize(t + 2, points, &mut hull);
             hull.next[next] = next;
             next = q;
         }
 
         //eprintln!("walking backwards in hull...");
-        // walk backward from the other side, adding more triangles 
+        // walk backward from the other side, adding more triangles
         // and flipping
         if backwards {
             loop {
@@ -850,8 +861,7 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
                 if !counter_clockwise(p, &points[q], &points[e]) {
                     break;
                 }
-                t = triangulation.add_triangle(q, i, e, INVALID_INDEX, 
-                    hull.tri[e], hull.tri[q]);
+                t = triangulation.add_triangle(q, i, e, INVALID_INDEX, hull.tri[e], hull.tri[q]);
                 triangulation.legalize(t + 2, points, &mut hull);
                 hull.tri[q] = t;
                 hull.next[e] = e;
@@ -872,8 +882,9 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
 
     for e in 0..triangulation.triangles.len() {
         let endpoint = triangulation.triangles[next_halfedge(e)];
-        if triangulation.halfedges[e] == INVALID_INDEX ||
-           triangulation.inedges[endpoint] == INVALID_INDEX {
+        if triangulation.halfedges[e] == INVALID_INDEX
+            || triangulation.inedges[endpoint] == INVALID_INDEX
+        {
             triangulation.inedges[endpoint] = e;
         }
     }
@@ -899,8 +910,6 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
             break;
         }
     }
-
-
 
     //eprintln!("done");
 

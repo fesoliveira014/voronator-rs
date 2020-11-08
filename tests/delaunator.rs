@@ -1,9 +1,9 @@
-extern crate voronator;
 extern crate serde_json;
+extern crate voronator;
 
-use voronator::delaunator::{triangulate, Point, Triangulation, INVALID_INDEX, EPSILON};
 use std::f64;
 use std::fs::File;
+use voronator::delaunator::{triangulate, Point, Triangulation, EPSILON, INVALID_INDEX};
 
 #[test]
 fn basic() {
@@ -23,10 +23,18 @@ fn square() {
 
 #[test]
 fn issue_11() {
-    let points: Vec<Point> = vec![(516., 661.), (369., 793.), (426., 539.), (273., 525.), (204., 694.), (747., 750.), (454., 390.)]
-        .iter()
-        .map(|p| Point { x: p.0, y: p.1 })
-        .collect();
+    let points: Vec<Point> = vec![
+        (516., 661.),
+        (369., 793.),
+        (426., 539.),
+        (273., 525.),
+        (204., 694.),
+        (747., 750.),
+        (454., 390.),
+    ]
+    .iter()
+    .map(|p| Point { x: p.0, y: p.1 })
+    .collect();
 
     validate(&points);
 }
@@ -39,10 +47,20 @@ fn issue_13() {
 
 #[test]
 fn issue_24() {
-    let points: Vec<Point> = vec![(382., 302.), (382., 328.), (382., 205.), (623., 175.), (382., 188.), (382., 284.), (623., 87.), (623., 341.), (141., 227.)]
-        .iter()
-        .map(|p| Point { x: p.0, y: p.1 })
-        .collect();
+    let points: Vec<Point> = vec![
+        (382., 302.),
+        (382., 328.),
+        (382., 205.),
+        (623., 175.),
+        (382., 188.),
+        (382., 284.),
+        (623., 87.),
+        (623., 341.),
+        (141., 227.),
+    ]
+    .iter()
+    .map(|p| Point { x: p.0, y: p.1 })
+    .collect();
 
     validate(&points);
 }
@@ -62,13 +80,13 @@ fn issue_44() {
 #[test]
 fn robustness() {
     let robustness1 = load_fixture("tests/fixtures/robustness1.json");
-    
+
     validate(&robustness1);
     validate(&(scale_points(&robustness1, 1e-9)));
     validate(&(scale_points(&robustness1, 1e-2)));
     validate(&(scale_points(&robustness1, 100.0)));
     validate(&(scale_points(&robustness1, 1e9)));
-    
+
     let robustness2 = load_fixture("tests/fixtures/robustness2.json");
     validate(&robustness2[0..100]);
     validate(&robustness2);
@@ -77,7 +95,7 @@ fn robustness() {
 #[test]
 fn few_points() {
     let points = load_fixture("tests/fixtures/ukraine.json");
-    
+
     let d = triangulate(&points[0..0]);
     assert!(d.is_none());
 
@@ -91,7 +109,7 @@ fn few_points() {
 #[test]
 fn collinear() {
     let points: Vec<Point> = vec![(0., 0.), (1., 0.), (3., 0.), (2., 0.)]
-       .iter()
+        .iter()
         .map(|p| Point { x: p.0, y: p.1 })
         .collect();
 
@@ -105,7 +123,8 @@ fn scale_points(points: &[Point], scale: f64) -> Vec<Point> {
         .map(|p| Point {
             x: p.x * scale,
             y: p.y * scale,
-        }).collect();
+        })
+        .collect();
     scaled
 }
 
@@ -120,10 +139,9 @@ fn triangle_area(points: &[Point], delaunay: &Triangulation) -> f64 {
     let mut t = 0;
     while t < delaunay.triangles.len() {
         let a = &points[delaunay.triangles[t]];
-        let b = &points[delaunay.triangles[t+1]];
-        let c = &points[delaunay.triangles[t+2]];
-        let val = ((b.y - a.y) * (c.x - b.x) - 
-                   (b.x - a.x) * (c.y - b.y)).abs();
+        let b = &points[delaunay.triangles[t + 1]];
+        let c = &points[delaunay.triangles[t + 2]];
+        let val = ((b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y)).abs();
         vals.push(val);
         t += 3;
     }
