@@ -56,7 +56,7 @@
 
 use std::{f64, fmt, usize};
 
-/// Defines a comparison epsilon used for floating-point comparissons
+/// Defines a comparison epsilon used for floating-point comparisons
 pub const EPSILON: f64 = f64::EPSILON * 2.0;
 
 /// Defines an invalid index in the Triangulation vectors
@@ -109,11 +109,8 @@ impl Point {
 }
 
 impl From<(f64, f64)> for Point {
-    fn from(item: (f64, f64)) -> Self {
-        Point {
-            x: item.0,
-            y: item.1,
-        }
+    fn from((x, y): (f64, f64)) -> Self {
+        Point { x, y }
     }
 }
 

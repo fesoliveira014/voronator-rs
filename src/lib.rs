@@ -125,7 +125,7 @@ impl CentroidDiagram {
     ///
     /// Points are represented here as a `(f64, f64)` tuple.
     pub fn from_tuple(coords: &[(f64, f64)]) -> Option<Self> {
-        let points: Vec<Point> = coords.iter().map(|p| Point { x: p.0, y: p.1 }).collect();
+        let points: Vec<Point> = coords.iter().map(|p| Point::from(*p)).collect();
         CentroidDiagram::new(&points)
     }
 
@@ -190,9 +190,9 @@ impl VoronoiDiagram {
     ///
     /// Points are represented here as a `(f64, f64)` tuple.
     pub fn from_tuple(min: &(f64, f64), max: &(f64, f64), coords: &[(f64, f64)]) -> Option<Self> {
-        let points: Vec<Point> = coords.iter().map(|p| Point { x: p.0, y: p.1 }).collect();
-        let min = Point { x: min.0, y: min.1 };
-        let max = Point { x: max.0, y: max.1 };
+        let points: Vec<Point> = coords.iter().map(|p| Point::from(*p)).collect();
+        let min = Point::from(*min);
+        let max = Point::from(*max);
         VoronoiDiagram::new(&min, &max, &points)
     }
 
@@ -263,7 +263,7 @@ impl VoronoiDiagram {
 
 fn calculate_centroids(points: &[Point], delaunay: &Triangulation) -> Vec<Point> {
     let num_triangles = delaunay.len();
-    let mut centroids = vec![Point { x: 0., y: 0. }; num_triangles];
+    let mut centroids = Vec::with_capacity(num_triangles);
     for t in 0..num_triangles {
         let mut sum = Point { x: 0., y: 0. };
         for i in 0..3 {
@@ -272,10 +272,10 @@ fn calculate_centroids(points: &[Point], delaunay: &Triangulation) -> Vec<Point>
             sum.x += p.x;
             sum.y += p.y;
         }
-        centroids[t] = Point {
+        centroids.push(Point {
             x: sum.x / 3.,
             y: sum.y / 3.,
-        };
+        });
     }
     centroids
 }
