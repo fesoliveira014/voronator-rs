@@ -56,7 +56,7 @@
 
 use std::{f64, fmt, usize};
 
-/// Defines a comparison epsilon used for floating-point comparissons
+/// Defines a comparison epsilon used for floating-point comparisons
 pub const EPSILON: f64 = f64::EPSILON * 2.0;
 
 /// Defines an invalid index in the Triangulation vectors
@@ -109,11 +109,8 @@ impl Point {
 }
 
 impl From<(f64, f64)> for Point {
-    fn from(item: (f64, f64)) -> Self {
-        Point {
-            x: item.0,
-            y: item.1,
-        }
+    fn from((x, y): (f64, f64)) -> Self {
+        Point { x, y }
     }
 }
 
@@ -146,9 +143,9 @@ fn circumradius(a: &Point, b: &Point, c: &Point) -> f64 {
     let x = (e.y * bl - d.y * cl) * (0.5 / det);
     let y = (d.x * cl - e.x * bl) * (0.5 / det);
 
-    if (bl > 0.0 || bl < 0.0) &&
-       (cl > 0.0 || cl < 0.0) &&
-       (det > 0.0 || det < 0.0) {
+    if (bl != 0.0) &&
+       (cl != 0.0) &&
+       (det != 0.0) {
         x * x + y * y
     } else {
         f64::MAX
@@ -174,9 +171,9 @@ pub fn circumcenter(a: &Point, b: &Point, c: &Point) -> Option<Point> {
     let x = (e.y * bl - d.y * cl) * (0.5 / det);
     let y = (d.x * cl - e.x * bl) * (0.5 / det);
 
-    if (bl > 0.0 || bl < 0.0) &&
-       (cl > 0.0 || cl < 0.0) &&
-       (det > 0.0 || det < 0.0) {
+    if (bl != 0.0) &&
+       (cl != 0.0) &&
+       (det != 0.0) {
         Some(Point {
             x: a.x + x,
             y: a.y + y,
@@ -639,9 +636,8 @@ fn find_closest_point(points: &[Point], p: &Point) -> usize {
     let mut min_dist = f64::MAX;
     let mut k = INVALID_INDEX;
 
-    for i in 0..points.len() {
+    for (i, q) in points.iter().enumerate() {
         if i != k {
-            let q = &points[i];
             let d = Point::dist2(&p, &q);
 
             if d < min_dist && d > 0.0 {
@@ -665,9 +661,8 @@ fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize,
     // with the first two
     let mut min_radius = f64::MAX;
     let mut i2 = INVALID_INDEX;
-    for i in 0..points.len() {
+    for (i, p) in points.iter().enumerate() {
         if i != i0 && i != i1 {
-            let p = &points[i];
             let r = circumradius(&p0, &p1, &p);
 
             if r < min_radius {
@@ -691,22 +686,13 @@ fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize,
 }
 
 fn to_points(coords: &[f64]) -> Vec<Point> {
-    let mut points: Vec<Point> = Vec::new();
-
-    let mut i = 0;
-    loop {
-        if i == coords.len() {
-            break;
-        }
-        let p = Point {
-            x: coords[i],
-            y: coords[i + 1],
-        };
-        points.push(p);
-        i += 2;
-    }
-
-    points
+    coords
+        .chunks(2)
+        .map(|tuple| Point {
+            x: tuple[0],
+            y: tuple[1],
+        })
+        .collect()
 }
 
 /// Calculates the Delaunay triangulation, if it exists, for a given set of 2D
