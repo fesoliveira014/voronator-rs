@@ -282,6 +282,12 @@ pub fn triangles_adjacent_to_triangle(t: usize, delaunay: &Triangulation) -> Vec
 /// * `delaunay` - A reference to a fully constructed Triangulation
 pub fn edges_around_point(start: usize, delaunay: &Triangulation) -> Vec<usize> {
     let mut result: Vec<usize> = vec![];
+
+    // If the starting index is invalid we can't continue
+    if start == INVALID_INDEX {
+        return result;
+    }
+
     let mut incoming = start;
     loop {
         result.push(incoming);
