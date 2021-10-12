@@ -79,7 +79,6 @@
 //! }
 //! ```
 
-mod clip;
 pub mod polygon;
 pub mod delaunator;
 
@@ -260,37 +259,6 @@ impl VoronoiDiagram {
     /// Cells are represented as a `Polygon`.
     pub fn cells(&self) -> &[Polygon] {
         &self.cells[..self.cells.len()-self.num_helper_points]
-    }
-
-    fn calculate_clip_vectors(points: &[Point], delaunay: &Triangulation) -> Vec<Point> {
-        let mut vectors: Vec<Point> = vec![Point { x: 0., y: 0. }; 2 * points.len()];
-        let mut i = 0;
-        let mut node = delaunay.hull[0];
-        let mut i0: usize;
-        let mut i1: usize = node * 2;
-        let mut p0: &Point;
-        let mut p1: &Point = &points[node];
-
-        loop {
-            i += 1;
-            if i == delaunay.hull.len() {
-                i = 0;
-            }
-            node = delaunay.hull[i];
-            i0 = i1;
-            p0 = p1;
-            i1 = node * 2;
-            p1 = &points[node];
-            vectors[i1].x = p0.y - p1.y;
-            vectors[i1].y = p1.x - p0.x;
-            vectors[i0 + 1].x = vectors[i1].x;
-            vectors[i0 + 1].y = vectors[i1].y;
-            if node == delaunay.hull[0] {
-                break;
-            }
-        }
-
-        vectors
     }
 
     fn calculate_polygons(

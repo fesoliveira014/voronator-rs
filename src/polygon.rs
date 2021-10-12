@@ -1,18 +1,39 @@
+//! Provides functions for handling polygons.
+//!
+//! Polygons are stored as a Vec<Point>
+//! 
+//! # Example
+//!
+//! ```no_run
+//! extern crate voronator;
+//!
+//! use voronator::polygon::Polygon;
+//!
+//! fn main() {
+//!     let points = vec![Point{x: 0., y: 0.}, Point{x: 1., y: 0.}, Point{x: 1., y: 1.}, Point{x: 0., y: 1.}];
+//!     let polygon = Polygon::from_points(points);
+//! }
+//!
+
 use crate::delaunator::Point;
 
+/// Represents a polygon.
 pub struct Polygon {
     pub(crate) points: Vec<Point>,
 }
 
 impl Polygon {
+    /// Create an empty polygon with no points.
     pub fn new() -> Self {
         Polygon { points: Vec::new() }
     }
 
+    /// Create a polygon consisting of the points supplied.
     pub fn from_points(points: Vec<Point>) -> Self {
         Polygon { points }
     }
 
+    /// Return a slice of points representing the polygon.
     pub fn points(&self) -> &[Point] {
         &self.points
     }
@@ -43,12 +64,12 @@ fn intersection(cp1: &Point, cp2: &Point, s: &Point, e: &Point) -> Point {
     }
 }
 
-// Sutherland-Hodgman clipping modified from https://rosettacode.org/wiki/Sutherland-Hodgman_polygon_clipping#C.2B.2B
+/// Sutherland-Hodgman clipping modified from https://rosettacode.org/wiki/Sutherland-Hodgman_polygon_clipping#C.2B.2B
 pub fn sutherland_hodgman(subject: &Polygon, clip: &Polygon) -> Polygon {
     let mut output_polygon = Polygon::new();
     let mut input_polygon = Polygon::new();
 
-    let mut clipped = false;
+    //let mut clipped = false;
     output_polygon.points.clone_from(&subject.points);
 
     let mut new_polygon_size = subject.points.len();
@@ -83,7 +104,7 @@ pub fn sutherland_hodgman(subject: &Polygon, clip: &Polygon) -> Polygon {
                 output_polygon.points.push(intersection(cp1, cp2, s, e));
                 output_polygon.points.push(e.clone());
 
-                clipped = true;
+                //clipped = true;
                 counter += 1;
                 counter += 1;
 
@@ -92,7 +113,7 @@ pub fn sutherland_hodgman(subject: &Polygon, clip: &Polygon) -> Polygon {
             // is added to the output list
             } else if inside(s, cp1, cp2) && !inside(e, cp1, cp2) {
                 output_polygon.points.push(intersection(cp1, cp2, s, e));
-                clipped = true;
+                //clipped = true;
                 counter += 1;
 
                 // Case 4: Both vertices are outside
