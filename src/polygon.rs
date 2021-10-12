@@ -12,6 +12,10 @@ impl Polygon {
     pub fn from_points(points: Vec<Point>) -> Self {
         Polygon { points }
     }
+
+    pub fn points(&self) -> &[Point] {
+        &self.points
+    }
 }
 
 fn inside(p: &Point, p1: &Point, p2: &Point) -> bool {
@@ -37,46 +41,6 @@ fn intersection(cp1: &Point, cp2: &Point, s: &Point, e: &Point) -> Point {
         x: (n1 * dp.x - n2 * dc.x) * n3,
         y: (n1 * dp.y - n2 * dc.y) * n3,
     }
-}
-
-pub fn project_point(p: &Point, v: &Point, min: &Point, max: &Point) -> Point {
-    let mut t = f64::INFINITY;
-    let mut c: f64;
-    let mut x = 0.;
-    let mut y = 0.;
-
-    if v.y < 0. {
-        (c = (min.y - p.y) / v.y);
-        if c < t {
-            y = min.y;
-            t = c;
-            x = p.x + t * v.x;
-        }
-    } else if v.y > 0. {
-        (c = (max.y - p.y) / v.y);
-        if c < t {
-            y = max.y;
-            t = c;
-            x = p.x + t * v.x;
-        }
-    }
-    if v.x > 0. {
-        c = (max.x - p.x) / v.x;
-        if c < t {
-            x = max.x;
-            t = c;
-            y = p.y + t * v.y;
-        }
-    } else if v.x < 0. {
-        c = (min.x - p.x) / v.x;
-        if (c / v.x) < t {
-            x = min.x;
-            t = c;
-            y = p.y + t * v.y;
-        }
-    }
-
-    Point { x, y }
 }
 
 // Sutherland-Hodgman clipping modified from https://rosettacode.org/wiki/Sutherland-Hodgman_polygon_clipping#C.2B.2B
