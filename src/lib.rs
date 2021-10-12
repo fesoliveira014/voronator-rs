@@ -80,6 +80,7 @@
 //! ```
 
 mod clip;
+pub mod polygon;
 pub mod delaunator;
 
 use std::{f64, usize};
@@ -237,24 +238,28 @@ impl VoronoiDiagram {
     ) -> Vec<Vec<Point>> {
         let mut polygons: Vec<Vec<Point>> = vec![];
 
+        // Create a polygon defining the region to clip to
+        let clip_points = vec![Point{x: min.x, y: min.y}, Point{x:max.x, y: min.y}, Point{x: max.x, y:max.y}, Point{x: min.x, y:max.y}];
+        let clip_polygon = polygon::Polygon::from_points(clip_points);
+
         for t in 0..points.len() {
             let incoming = delaunay.inedges[t];
             let edges = edges_around_point(incoming, delaunay);
             let triangles: Vec<usize> = edges.into_iter().map(triangle_of_edge).collect();
-            let polygon: Vec<Point> = triangles.into_iter().map(|t| centers[t].clone()).collect();
+            let mut polygon: Vec<Point> = triangles.into_iter().map(|t| centers[t].clone()).collect();
 
-            let v = t * 2;
-            let vertices = if vectors[v].x != 0. || vectors[v].y != 0. {
-                clip_infinite(&polygon, &vectors[v], &vectors[v + 1], min, max)
-            } else {
-                clip_finite(&polygon, min, max)
-            };
-
-            if vertices.is_empty() {
-                continue;
+            // If we only have one point in the polygon, then project the points 
+            if polygon.len() < 2 {
+                let v = t * 2;
+            
+                polygon.push(polygon::project_point(&polygon[polygon.len() - 1], &vectors[v + 1], min, max));
+                polygon.push(polygon::project_point(&polygon[0], &vectors[v], min, max));
             }
 
-            polygons.push(vertices);
+            let polygon = polygon::Polygon::from_points(polygon);
+            let polygon = polygon::sutherland_hodgman(&polygon, &clip_polygon);
+
+            polygons.push(polygon.points);
         }
 
         polygons

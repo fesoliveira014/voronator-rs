@@ -3,6 +3,7 @@ extern crate voronator;
 
 use std::f64;
 use std::fs::File;
+use voronator::VoronoiDiagram;
 use voronator::delaunator::{triangulate, Point, Triangulation, EPSILON, INVALID_INDEX};
 
 #[test]
@@ -43,6 +44,35 @@ fn issue_11() {
 fn issue_13() {
     let points = load_fixture("tests/fixtures/issue13.json");
     validate(&points);
+}
+
+#[test]
+fn duplicated_points(){
+    use std::collections::HashSet;
+    let points =  [(2520.0, 856.0), (794.0, 66.0), (974.0, 446.0)];
+    let voronoi = VoronoiDiagram::from_tuple( &(0.0, 0.0), &(2560.0, 2560.0), &points).unwrap();
+
+    println!("# cells: {}", voronoi.cells.len());
+
+    for cell_vertices in &voronoi.cells {
+        {
+            let expected = cell_vertices.len();
+            let actual = cell_vertices
+                .iter()
+                .map(|n| format!("{:?}", n))
+                .collect::<HashSet<String>>()
+                .len();
+            println!(" {} != {}", expected, actual);
+            println!(
+                "{}",
+                cell_vertices
+                    .iter()
+                    .map(|n| format!("{:?}", n))
+                    .collect::<String>()
+            );
+            assert!( expected == actual)
+        }
+    }
 }
 
 #[test]
