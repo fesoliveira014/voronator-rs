@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     println!("triangles: {}", diagram.delaunay.len());
-    println!("cells: {}", diagram.cells.len());
+    println!("cells: {}", diagram.cells().len());
 
     // for cell in &diagram.cells {
     //     let color = RGBColor{0: rng.gen(), 1: rng.gen(), 2: rng.gen()};
@@ -73,8 +73,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     root.draw(&poly)?;
     // }
 
-    for cell in &diagram.cells {
-        let p: Vec<(f32, f32)> = cell.into_iter().map(|x| (x.x as f32, x.y as f32)).collect();
+    for cell in diagram.cells() {
+        let p: Vec<(f32, f32)> = cell.points().into_iter().map(|x| (x.x as f32, x.y as f32)).collect();
 
         for _ in 0..p.len() {
             let plot = PathElement::new(

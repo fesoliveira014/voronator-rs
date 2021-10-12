@@ -1,5 +1,5 @@
 #![warn(missing_docs)]
-#![warn(missing_doc_code_examples)]
+#![warn(rustdoc::missing_doc_code_examples)]
 //! Constructs a Voronoi diagram given a set of points.
 //!
 //! This module was adapted from [d3-delaunay](https://github.com/d3/d3-delaunay) and from
@@ -40,8 +40,8 @@
 //!
 //!     let diagram = VoronoiDiagram::from_tuple(&(0., 0.), &(100., 100.), &points).unwrap();
 //!     
-//!     for cell in diagram.cells {
-//!         let p: Vec<(f32, f32)> = cell.into_iter()
+//!     for cell in diagram.cells() {
+//!         let p: Vec<(f32, f32)> = cell.points().into_iter()
 //!             .map(|x| (x.x as f32, x.y as f32))
 //!             .collect();
 //!         
@@ -79,13 +79,13 @@
 //! }
 //! ```
 
-mod clip;
+pub mod polygon;
 pub mod delaunator;
 
 use std::{f64, usize};
 
-use crate::clip::{clip_finite, clip_infinite};
 use crate::delaunator::*;
+use crate::polygon::*;
 
 /// Represents a centroidal tesselation diagram.
 pub struct CentroidDiagram {
@@ -149,6 +149,38 @@ impl CentroidDiagram {
     }
 }
 
+fn helper_points(polygon: &Polygon) -> Vec<Point> {
+    let mut points = vec![];
+
+    let mut min = Point{x: f64::MAX, y: f64::MAX};
+    let mut max = Point{x: f64::MIN, y: f64::MIN};
+
+    for point in polygon.points() {
+        if point.x < min.x {
+            min.x = point.x;
+        }
+        if point.x > max.x {
+            max.x = point.x;
+        }
+        if point.y < min.y {
+            min.y = point.y;
+        }
+        if point.y > max.y {
+            max.y = point.y;
+        }
+    }
+
+    let width = max.x - min.x;
+    let height = max.y - min.y;
+
+    points.push(Point{x: min.x - width, y: min.y + height / 2.0});
+    points.push(Point{x: max.x + width, y: min.y + height / 2.0});
+    points.push(Point{x: min.x + width / 2.0, y: min.y - height});
+    points.push(Point{x: min.x + width / 2.0, y: max.y + height});
+
+    points
+}
+
 /// Represents a Voronoi diagram.
 pub struct VoronoiDiagram {
     /// Contains the input data
@@ -160,9 +192,11 @@ pub struct VoronoiDiagram {
     /// Stores the circumcenter of each triangle
     pub centers: Vec<Point>,
     /// Stores the coordinates of each vertex of a cell, in counter-clockwise order
-    pub cells: Vec<Vec<Point>>,
+    cells: Vec<Polygon>,
     /// Stores the neighbor of each cell
     pub neighbors: Vec<Vec<usize>>,
+
+    num_helper_points: usize,
 }
 
 impl VoronoiDiagram {
@@ -171,18 +205,40 @@ impl VoronoiDiagram {
     /// Points are represented here as a [`delaunator::Point`].
     /// [`delaunator::Point`]: ./delaunator/struct.Point.html
     pub fn new(min: &Point, max: &Point, points: &[Point]) -> Option<Self> {
-        let delaunay = triangulate(points)?;
-        let centers = calculate_circumcenters(points, &delaunay);
-        let vectors = VoronoiDiagram::calculate_clip_vectors(points, &delaunay);
+        // Create a polygon defining the region to clip to (rectangle from min point to max point)
+        let clip_points = vec![Point{x: min.x, y: min.y}, Point{x:max.x, y: min.y}, Point{x: max.x, y:max.y}, Point{x: min.x, y:max.y}];
+        let clip_polygon = polygon::Polygon::from_points(clip_points);
+
+        VoronoiDiagram::with_bounding_polygon(points.to_vec(), &clip_polygon)
+    }
+
+    /// Creates a Voronoi diagram, if it exists, for a given set of points bounded by the supplied polygon.
+    ///
+    /// Points are represented here as a [`delaunator::Point`].
+    /// [`delaunator::Point`]: ./delaunator/struct.Point.html
+    pub fn with_bounding_polygon(mut points: Vec<Point>, clip_polygon: &Polygon) -> Option<Self> {
+        // Add in the 
+        let mut helper_points = helper_points(&clip_polygon);
+        let num_helper_points = helper_points.len();
+        points.append(&mut helper_points);
+
+        VoronoiDiagram::with_helper_points(points, clip_polygon, num_helper_points)
+    }
+
+    fn with_helper_points(points: Vec<Point>, clip_polygon: &Polygon, num_helper_points: usize) -> Option<Self> {
+        let delaunay = triangulate(&points)?;
+        let centers = calculate_circumcenters(&points, &delaunay);
         let cells =
-            VoronoiDiagram::calculate_polygons(points, &centers, &vectors, &delaunay, min, max);
-        let neighbors = calculate_neighbors(points, &delaunay);
+            VoronoiDiagram::calculate_polygons(&points, &centers, &delaunay, &clip_polygon);
+        let neighbors = calculate_neighbors(&points, &delaunay);
+
         Some(VoronoiDiagram {
-            sites: points.to_vec(),
+            sites: points,
             delaunay,
             centers,
             cells,
             neighbors,
+            num_helper_points,
         })
     }
 
@@ -191,51 +247,27 @@ impl VoronoiDiagram {
     /// Points are represented here as a `(f64, f64)` tuple.
     pub fn from_tuple(min: &(f64, f64), max: &(f64, f64), coords: &[(f64, f64)]) -> Option<Self> {
         let points: Vec<Point> = coords.iter().map(|p| Point::from(*p)).collect();
-        let min = Point::from(*min);
-        let max = Point::from(*max);
-        VoronoiDiagram::new(&min, &max, &points)
+        
+        let clip_points = vec![Point{x: min.0, y: min.1}, Point{x:max.0, y: min.1}, Point{x: max.0, y:max.1}, Point{x: min.0, y:max.1}];
+        let clip_polygon = polygon::Polygon::from_points(clip_points);
+
+        VoronoiDiagram::with_bounding_polygon(points, &clip_polygon)
     }
 
-    fn calculate_clip_vectors(points: &[Point], delaunay: &Triangulation) -> Vec<Point> {
-        let mut vectors: Vec<Point> = vec![Point { x: 0., y: 0. }; 2 * points.len()];
-        let mut i = 0;
-        let mut node = delaunay.hull[0];
-        let mut i0: usize;
-        let mut i1: usize = node * 2;
-        let mut p0: &Point;
-        let mut p1: &Point = &points[node];
-
-        loop {
-            i += 1;
-            if i == delaunay.hull.len() {
-                i = 0;
-            }
-            node = delaunay.hull[i];
-            i0 = i1;
-            p0 = p1;
-            i1 = node * 2;
-            p1 = &points[node];
-            vectors[i1].x = p0.y - p1.y;
-            vectors[i1].y = p1.x - p0.x;
-            vectors[i0 + 1].x = vectors[i1].x;
-            vectors[i0 + 1].y = vectors[i1].y;
-            if node == delaunay.hull[0] {
-                break;
-            }
-        }
-
-        vectors
+    /// Returns slice containing the valid cells in the Voronoi diagram.
+    ///
+    /// Cells are represented as a `Polygon`.
+    pub fn cells(&self) -> &[Polygon] {
+        &self.cells[..self.cells.len()-self.num_helper_points]
     }
 
     fn calculate_polygons(
         points: &[Point],
         centers: &[Point],
-        vectors: &[Point],
         delaunay: &Triangulation,
-        min: &Point,
-        max: &Point,
-    ) -> Vec<Vec<Point>> {
-        let mut polygons: Vec<Vec<Point>> = vec![];
+        clip_polygon: &Polygon,
+    ) -> Vec<Polygon> {
+        let mut polygons: Vec<Polygon> = vec![];
 
         for t in 0..points.len() {
             let incoming = delaunay.inedges[t];
@@ -243,18 +275,10 @@ impl VoronoiDiagram {
             let triangles: Vec<usize> = edges.into_iter().map(triangle_of_edge).collect();
             let polygon: Vec<Point> = triangles.into_iter().map(|t| centers[t].clone()).collect();
 
-            let v = t * 2;
-            let vertices = if vectors[v].x != 0. || vectors[v].y != 0. {
-                clip_infinite(&polygon, &vectors[v], &vectors[v + 1], min, max)
-            } else {
-                clip_finite(&polygon, min, max)
-            };
+            let polygon = polygon::Polygon::from_points(polygon);
+            let polygon = polygon::sutherland_hodgman(&polygon, &clip_polygon);
 
-            if vertices.is_empty() {
-                continue;
-            }
-
-            polygons.push(vertices);
+            polygons.push(polygon);
         }
 
         polygons

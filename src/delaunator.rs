@@ -1,5 +1,5 @@
 #![warn(missing_docs)]
-#![warn(missing_doc_code_examples)]
+#![warn(rustdoc::missing_doc_code_examples)]
 //! Implements the Delaunay triangulation algorithm.
 //!
 //! This module was ported from the original [Delaunator](https://github.com/mapbox/delaunator), by Mapbox. If a triangulation is possible a given set of points in the 2D space, it returns a [`Triangulation`] structure. This structure contains three main components: [`triangles`], [`halfedges`] and [`hull`]:

@@ -23,8 +23,8 @@ fn main() {
 
     let diagram = VoronoiDiagram::from_tuple(&(0., 0.), &(100., 100.), &points).unwrap();
     
-    for cell in diagram.cells {
-        let p: Vec<(f32, f32)> = cell.into_iter()
+    for cell in diagram.cells() {
+        let p: Vec<(f32, f32)> = cell.points().into_iter()
             .map(|x| (x.x as f32, x.y as f32))
             .collect();
         
