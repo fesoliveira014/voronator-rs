@@ -1,6 +1,7 @@
 extern crate voronator;
 
 use voronator::VoronoiDiagram;
+use voronator::delaunator::Point;
 
 use svg::node;
 use svg::node::element::Path;
@@ -11,7 +12,7 @@ use std::collections::HashSet;
 
 fn main() {
     let points = [(2520.0, 856.0), (794.0, 66.0), (974.0, 446.0)];
-    let voronoi = VoronoiDiagram::from_tuple(&(0.0, 0.0), &(2560.0, 2560.0), &points).unwrap();
+    let voronoi = VoronoiDiagram::<Point>::from_tuple(&(0.0, 0.0), &(2560.0, 2560.0), &points).unwrap();
 
     let mut document = Document::new().set("viewBox", (0, 0, 2560, 2560));
     let colours = ["blue", "green", "red"];

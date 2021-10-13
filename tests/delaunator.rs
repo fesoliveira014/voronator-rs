@@ -3,7 +3,7 @@ extern crate voronator;
 
 use std::f64;
 use std::fs::File;
-use voronator::delaunator::{triangulate, Point, Triangulation, EPSILON, INVALID_INDEX};
+use voronator::delaunator::*;
 use voronator::VoronoiDiagram;
 
 #[test]
@@ -46,11 +46,18 @@ fn issue_13() {
     validate(&points);
 }
 
+
+#[test]
+fn trait_test() {
+    let point = Point::from_xy(1.0, 1.0);
+    println!("{:?}", Point::vector(&point, &point));
+}
+
 #[test]
 fn duplicated_points() {
     use std::collections::HashSet;
     let points = [(2520.0, 856.0), (794.0, 66.0), (974.0, 446.0)];
-    let voronoi = VoronoiDiagram::from_tuple(&(0.0, 0.0), &(2560.0, 2560.0), &points).unwrap();
+    let voronoi = VoronoiDiagram::<Point>::from_tuple(&(0.0, 0.0), &(2560.0, 2560.0), &points).unwrap();
 
     println!("# cells: {}", voronoi.cells().len());
     for polygon in voronoi.cells() {

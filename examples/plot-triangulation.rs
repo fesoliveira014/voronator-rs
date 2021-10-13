@@ -5,6 +5,7 @@ extern crate voronator;
 use plotters::prelude::*;
 use rand::prelude::*;
 use rand_distr::Uniform;
+use voronator::delaunator::Point;
 use voronator::delaunator::triangulate_from_tuple;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|_| (rng.sample(&range), rng.sample(&range)))
         .collect();
 
-    let (t, ps) = triangulate_from_tuple(&points).expect("No triangulation exists for this input.");
+    let (t, ps) = triangulate_from_tuple::<Point>(&points).expect("No triangulation exists for this input.");
 
     let root = BitMapBackend::new("plot.png", (960, 400)).into_drawing_area();
     root.fill(&WHITE)?;
