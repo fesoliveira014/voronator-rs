@@ -27,6 +27,7 @@
 //! extern crate rand;
 //!
 //! use voronator::VoronoiDiagram;
+//! use voronator::delaunator::Point;
 //! use rand::prelude::*;
 //! use rand::distributions::Uniform;
 //!
@@ -38,7 +39,7 @@
 //!         .map(|_| (rng.sample(&range1), rng.sample(&range2)))
 //!         .collect();
 //!
-//!     let diagram = VoronoiDiagram::from_tuple(&(0., 0.), &(100., 100.), &points).unwrap();
+//!     let diagram = VoronoiDiagram::<Point>::from_tuple(&(0., 0.), &(100., 100.), &points).unwrap();
 //!     
 //!     for cell in diagram.cells() {
 //!         let p: Vec<(f32, f32)> = cell.points().into_iter()
@@ -56,6 +57,7 @@
 //! extern crate rand;
 //!
 //! use voronator::CentroidDiagram;
+//! use voronator::delaunator::Point;
 //! use rand::prelude::*;
 //! use rand::distributions::Uniform;
 //!
@@ -67,10 +69,10 @@
 //!         .map(|_| (rng.sample(&range1), rng.sample(&range2)))
 //!         .collect();
 //!
-//!     let diagram = CentroidDiagram::from_tuple(&points).unwrap();
+//!     let diagram = CentroidDiagram::<Point>::from_tuple(&points).unwrap();
 //!     
 //!     for cell in diagram.cells {
-//!         let p: Vec<(f32, f32)> = cell.into_iter()
+//!         let p: Vec<(f32, f32)> = cell.points().into_iter()
 //!             .map(|x| (x.x as f32, x.y as f32))
 //!             .collect();
 //!         
@@ -82,32 +84,34 @@
 pub mod polygon;
 pub mod delaunator;
 
+use rayon::prelude::*;
+
 use std::{f64, usize};
 
 use crate::delaunator::*;
 use crate::polygon::*;
 
 /// Represents a centroidal tesselation diagram.
-pub struct CentroidDiagram {
+pub struct CentroidDiagram<C: Coord + Vector<C>> {
     /// Contains the input data
-    pub sites: Vec<Point>,
+    pub sites: Vec<C>,
     /// A [`Triangulation`] struct that contains the Delaunay triangulation information.
     ///
     /// [`Triangulation`]: ./delaunator/struct.Triangulation.html
     pub delaunay: Triangulation,
     /// Stores the centroid of each triangle
-    pub centers: Vec<Point>,
+    pub centers: Vec<C>,
     /// Stores the coordinates of each vertex of a cell, in counter-clockwise order
-    pub cells: Vec<Vec<Point>>,
+    pub cells: Vec<Polygon<C>>,
     /// Stores the neighbor of each cell
     pub neighbors: Vec<Vec<usize>>,
 }
 
-impl CentroidDiagram {
+impl<C: Coord + Vector<C>> CentroidDiagram<C> {
     /// Creates a centroidal tesselation, if it exists, for a given set of points.
     ///
     /// Points are represented here as a `delaunator::Point`.
-    pub fn new(points: &[Point]) -> Option<Self> {
+    pub fn new(points: &[C]) -> Option<Self> {
         let delaunay = triangulate(points)?;
         let centers = calculate_centroids(points, &delaunay);
         let cells = CentroidDiagram::calculate_polygons(points, &centers, &delaunay);
@@ -125,88 +129,88 @@ impl CentroidDiagram {
     ///
     /// Points are represented here as a `(f64, f64)` tuple.
     pub fn from_tuple(coords: &[(f64, f64)]) -> Option<Self> {
-        let points: Vec<Point> = coords.iter().map(|p| Point::from(*p)).collect();
+        let points: Vec<C> = coords.iter().map(|p| C::from_xy(p.0, p.1)).collect();
         CentroidDiagram::new(&points)
     }
 
     fn calculate_polygons(
-        points: &[Point],
-        centers: &[Point],
+        points: &[C],
+        centers: &[C],
         delaunay: &Triangulation,
-    ) -> Vec<Vec<Point>> {
-        let mut polygons: Vec<Vec<Point>> = vec![];
+    ) -> Vec<Polygon<C>> {
+        let mut polygons: Vec<Polygon<C>> = vec![];
 
         for t in 0..points.len() {
             let incoming = delaunay.inedges[t];
             let edges = edges_around_point(incoming, delaunay);
             let triangles: Vec<usize> = edges.into_iter().map(triangle_of_edge).collect();
-            let polygon: Vec<Point> = triangles.into_iter().map(|t| centers[t].clone()).collect();
+            let polygon: Vec<C> = triangles.into_iter().map(|t| centers[t].clone()).collect();
 
-            polygons.push(polygon);
+            polygons.push(Polygon::from_points(polygon));
         }
 
         polygons
     }
 }
 
-fn helper_points(polygon: &Polygon) -> Vec<Point> {
+fn helper_points<C: Coord>(polygon: &Polygon<C>) -> Vec<C> {
     let mut points = vec![];
 
     let mut min = Point{x: f64::MAX, y: f64::MAX};
     let mut max = Point{x: f64::MIN, y: f64::MIN};
 
     for point in polygon.points() {
-        if point.x < min.x {
-            min.x = point.x;
+        if point.x() < min.x() {
+            min.x = point.x();
         }
-        if point.x > max.x {
-            max.x = point.x;
+        if point.x() > max.x() {
+            max.x = point.x();
         }
-        if point.y < min.y {
-            min.y = point.y;
+        if point.y() < min.y() {
+            min.y = point.y();
         }
-        if point.y > max.y {
-            max.y = point.y;
+        if point.y() > max.y() {
+            max.y = point.y();
         }
     }
 
-    let width = max.x - min.x;
-    let height = max.y - min.y;
+    let width = max.x() - min.x();
+    let height = max.y() - min.y();
 
-    points.push(Point{x: min.x - width, y: min.y + height / 2.0});
-    points.push(Point{x: max.x + width, y: min.y + height / 2.0});
-    points.push(Point{x: min.x + width / 2.0, y: min.y - height});
-    points.push(Point{x: min.x + width / 2.0, y: max.y + height});
+    points.push(C::from_xy(min.x() - width, min.y() + height / 2.0));
+    points.push(C::from_xy(max.x() + width, min.y() + height / 2.0));
+    points.push(C::from_xy(min.x() + width / 2.0,  min.y() - height));
+    points.push(C::from_xy(min.x() + width / 2.0,  max.y() + height));
 
     points
 }
 
 /// Represents a Voronoi diagram.
-pub struct VoronoiDiagram {
+pub struct VoronoiDiagram<C: Coord + Vector<C>> {
     /// Contains the input data
-    pub sites: Vec<Point>,
+    pub sites: Vec<C>,
     /// A [`Triangulation`] struct that contains the Delaunay triangulation information.
     ///
     /// [`Triangulation`]: ./delaunator/struct.Triangulation.html
     pub delaunay: Triangulation,
     /// Stores the circumcenter of each triangle
-    pub centers: Vec<Point>,
+    pub centers: Vec<C>,
     /// Stores the coordinates of each vertex of a cell, in counter-clockwise order
-    cells: Vec<Polygon>,
+    cells: Vec<Polygon<C>>,
     /// Stores the neighbor of each cell
     pub neighbors: Vec<Vec<usize>>,
 
     num_helper_points: usize,
 }
 
-impl VoronoiDiagram {
+impl<C: Coord + Vector<C>> VoronoiDiagram<C> {
     /// Creates a Voronoi diagram, if it exists, for a given set of points.
     ///
-    /// Points are represented here as a [`delaunator::Point`].
-    /// [`delaunator::Point`]: ./delaunator/struct.Point.html
-    pub fn new(min: &Point, max: &Point, points: &[Point]) -> Option<Self> {
+    /// Points are represented here as anything that implements [`delaunator::Coord` and `delaunator::Vector<Coord>`].
+    /// [`delaunator::Coord`]: ./delaunator/trait.Coord.html
+    pub fn new(min: &C, max: &C, points: &[C]) -> Option<Self> {
         // Create a polygon defining the region to clip to (rectangle from min point to max point)
-        let clip_points = vec![Point{x: min.x, y: min.y}, Point{x:max.x, y: min.y}, Point{x: max.x, y:max.y}, Point{x: min.x, y:max.y}];
+        let clip_points = vec![C::from_xy(min.x(), min.y()), C::from_xy(max.x(), min.y()), C::from_xy(max.x(), max.y()), C::from_xy(min.x(), max.y())];
         let clip_polygon = polygon::Polygon::from_points(clip_points);
 
         VoronoiDiagram::with_bounding_polygon(points.to_vec(), &clip_polygon)
@@ -214,9 +218,9 @@ impl VoronoiDiagram {
 
     /// Creates a Voronoi diagram, if it exists, for a given set of points bounded by the supplied polygon.
     ///
-    /// Points are represented here as a [`delaunator::Point`].
-    /// [`delaunator::Point`]: ./delaunator/struct.Point.html
-    pub fn with_bounding_polygon(mut points: Vec<Point>, clip_polygon: &Polygon) -> Option<Self> {
+    /// Points are represented here as anything that implements [`delaunator::Coord` and `delaunator::Vector<Coord>`].
+    /// [`delaunator::Coord`]: ./delaunator/trait.Coord.html
+    pub fn with_bounding_polygon(mut points: Vec<C>, clip_polygon: &Polygon<C>) -> Option<Self> {
         // Add in the 
         let mut helper_points = helper_points(&clip_polygon);
         let num_helper_points = helper_points.len();
@@ -225,7 +229,7 @@ impl VoronoiDiagram {
         VoronoiDiagram::with_helper_points(points, clip_polygon, num_helper_points)
     }
 
-    fn with_helper_points(points: Vec<Point>, clip_polygon: &Polygon, num_helper_points: usize) -> Option<Self> {
+    fn with_helper_points(points: Vec<C>, clip_polygon: &Polygon<C>, num_helper_points: usize) -> Option<Self> {
         let delaunay = triangulate(&points)?;
         let centers = calculate_circumcenters(&points, &delaunay);
         let cells =
@@ -246,9 +250,11 @@ impl VoronoiDiagram {
     ///
     /// Points are represented here as a `(f64, f64)` tuple.
     pub fn from_tuple(min: &(f64, f64), max: &(f64, f64), coords: &[(f64, f64)]) -> Option<Self> {
-        let points: Vec<Point> = coords.iter().map(|p| Point::from(*p)).collect();
+        let points: Vec<C> = coords.iter().map(|p| C::from_xy(p.0, p.1)).collect();
         
-        let clip_points = vec![Point{x: min.0, y: min.1}, Point{x:max.0, y: min.1}, Point{x: max.0, y:max.1}, Point{x: min.0, y:max.1}];
+        let clip_points = vec![C::from_xy(min.0, min.1), C::from_xy(max.0, min.1),
+        C::from_xy(max.0, max.1), C::from_xy(min.0, max.1)];
+        
         let clip_polygon = polygon::Polygon::from_points(clip_points);
 
         VoronoiDiagram::with_bounding_polygon(points, &clip_polygon)
@@ -257,35 +263,31 @@ impl VoronoiDiagram {
     /// Returns slice containing the valid cells in the Voronoi diagram.
     ///
     /// Cells are represented as a `Polygon`.
-    pub fn cells(&self) -> &[Polygon] {
+    pub fn cells(&self) -> &[Polygon<C>] {
         &self.cells[..self.cells.len()-self.num_helper_points]
     }
 
     fn calculate_polygons(
-        points: &[Point],
-        centers: &[Point],
+        points: &[C],
+        centers: &[C],
         delaunay: &Triangulation,
-        clip_polygon: &Polygon,
-    ) -> Vec<Polygon> {
-        let mut polygons: Vec<Polygon> = vec![];
-
-        for t in 0..points.len() {
+        clip_polygon: &Polygon<C>,
+    ) -> Vec<Polygon<C>> {
+        points.par_iter().enumerate().map(|(t, _point)| {
             let incoming = delaunay.inedges[t];
             let edges = edges_around_point(incoming, delaunay);
             let triangles: Vec<usize> = edges.into_iter().map(triangle_of_edge).collect();
-            let polygon: Vec<Point> = triangles.into_iter().map(|t| centers[t].clone()).collect();
+            let polygon: Vec<C> = triangles.into_iter().map(|t| centers[t].clone()).collect();
 
             let polygon = polygon::Polygon::from_points(polygon);
             let polygon = polygon::sutherland_hodgman(&polygon, &clip_polygon);
 
-            polygons.push(polygon);
-        }
-
-        polygons
+            polygon
+        }).collect()
     }
 }
 
-fn calculate_centroids(points: &[Point], delaunay: &Triangulation) -> Vec<Point> {
+fn calculate_centroids<C: Coord + Vector<C>>(points: &[C], delaunay: &Triangulation) -> Vec<C> {
     let num_triangles = delaunay.len();
     let mut centroids = Vec::with_capacity(num_triangles);
     for t in 0..num_triangles {
@@ -293,58 +295,55 @@ fn calculate_centroids(points: &[Point], delaunay: &Triangulation) -> Vec<Point>
         for i in 0..3 {
             let s = 3 * t + i; // triangle coord index
             let p = &points[delaunay.triangles[s]];
-            sum.x += p.x;
-            sum.y += p.y;
+            sum.x += p.x();
+            sum.y += p.y();
         }
-        centroids.push(Point {
-            x: sum.x / 3.,
-            y: sum.y / 3.,
-        });
+        centroids.push(C::from_xy(
+            sum.x / 3.,
+            sum.y / 3.,
+        ));
     }
     centroids
 }
 
-fn calculate_circumcenters(points: &[Point], delaunay: &Triangulation) -> Vec<Point> {
-    let num_triangles = delaunay.len();
-    let mut circumcenters = vec![Point { x: 0., y: 0. }; num_triangles];
-    for t in 0..num_triangles {
-        let v: Vec<Point> = points_of_triangle(t, delaunay)
-            .into_iter()
-            .map(|p| points[p].clone())
-            .collect();
-        if let Some(c) = circumcenter(&v[0], &v[1], &v[2]) {
-            circumcenters[t] = c;
+fn calculate_circumcenters<C: Coord + Vector<C>>(points: &[C], delaunay: &Triangulation) -> Vec<C> {
+    (0..delaunay.len()).into_par_iter().map(|t| {
+        let v: Vec<C> = points_of_triangle(t, delaunay)
+        .into_iter()
+        .map(|p| points[p].clone())
+        .collect();
+
+        match circumcenter(&v[0], &v[1], &v[2]) {
+            Some(c) => c,
+            None => C::from_xy(0., 0.)
         }
-    }
-    circumcenters
+    }).collect()
 }
 
-fn calculate_neighbors(points: &[Point], delaunay: &Triangulation) -> Vec<Vec<usize>> {
-    let num_points = points.len();
-    let mut neighbors: Vec<Vec<usize>> = vec![vec![]; num_points];
+fn calculate_neighbors<C: Coord + Vector<C>>(points: &[C], delaunay: &Triangulation) -> Vec<Vec<usize>> {
+    points.par_iter().enumerate().map(|(t, _point)| {
+        let mut neighbours: Vec<usize> = vec![];
 
-    for t in 0..num_points {
         let e0 = delaunay.inedges[t];
-        if e0 == INVALID_INDEX {
-            continue;
+        if e0 != INVALID_INDEX {
+            let mut e = e0;
+            loop {
+                neighbours.push(delaunay.triangles[e]);
+                e = next_halfedge(e);
+                if delaunay.triangles[e] != t {
+                    break;
+                }
+                e = delaunay.halfedges[e];
+                if e == INVALID_INDEX {
+                    neighbours.push(delaunay.triangles[delaunay.outedges[t]]);
+                    break;
+                }
+                if e == e0 {
+                    break;
+                }
+            }
         }
-        let mut e = e0;
-        loop {
-            neighbors[t].push(delaunay.triangles[e]);
-            e = next_halfedge(e);
-            if delaunay.triangles[e] != t {
-                break;
-            }
-            e = delaunay.halfedges[e];
-            if e == INVALID_INDEX {
-                neighbors[t].push(delaunay.triangles[delaunay.outedges[t]]);
-                break;
-            }
-            if e == e0 {
-                break;
-            }
-        }
-    }
 
-    neighbors
+        neighbours
+    }).collect()
 }

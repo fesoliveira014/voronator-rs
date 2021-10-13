@@ -6,7 +6,8 @@
 //!
 //! ```no_run
 //! extern crate voronator;
-//!
+//! 
+//! use voronator::delaunator::Point;
 //! use voronator::polygon::Polygon;
 //!
 //! fn main() {
@@ -15,57 +16,57 @@
 //! }
 //!
 
-use crate::delaunator::Point;
+use crate::delaunator::Coord;
 
 /// Represents a polygon.
-pub struct Polygon {
-    pub(crate) points: Vec<Point>,
+pub struct Polygon<C: Coord> {
+    pub(crate) points: Vec<C>,
 }
 
-impl Polygon {
+impl<C: Coord> Polygon<C> {
     /// Create an empty polygon with no points.
     pub fn new() -> Self {
         Polygon { points: Vec::new() }
     }
 
     /// Create a polygon consisting of the points supplied.
-    pub fn from_points(points: Vec<Point>) -> Self {
+    pub fn from_points(points: Vec<C>) -> Self {
         Polygon { points }
     }
 
     /// Return a slice of points representing the polygon.
-    pub fn points(&self) -> &[Point] {
+    pub fn points(&self) -> &[C] {
         &self.points
     }
 }
 
-fn inside(p: &Point, p1: &Point, p2: &Point) -> bool {
-    (p2.y - p1.y) * p.x + (p1.x - p2.x) * p.y + (p2.x * p1.y - p1.x * p2.y) < 0.0
+fn inside<C: Coord>(p: &C, p1: &C, p2: &C) -> bool {
+    (p2.y() - p1.y()) * p.x() + (p1.x() - p2.x()) * p.y() + (p2.x() * p1.y() - p1.x() * p2.y()) < 0.0
 }
 
-fn intersection(cp1: &Point, cp2: &Point, s: &Point, e: &Point) -> Point {
-    let dc = Point {
-        x: cp1.x - cp2.x,
-        y: cp1.y - cp2.y,
-    };
-    let dp = Point {
-        x: s.x - e.x,
-        y: s.y - e.y,
-    };
+fn intersection<C: Coord>(cp1: &C, cp2: &C, s: &C, e: &C) -> C {
+    let dc = C::from_xy(
+        cp1.x() - cp2.x(),
+        cp1.y() - cp2.y(),
+    );
+    let dp = C::from_xy(
+        s.x() - e.x(),
+        s.y() - e.y(),
+    );
 
-    let n1 = cp1.x * cp2.y - cp1.y * cp2.x;
-    let n2 = s.x * e.y - s.y * e.x;
+    let n1 = cp1.x() * cp2.y() - cp1.y() * cp2.x();
+    let n2 = s.x() * e.y() - s.y() * e.x();
 
-    let n3 = 1.0 / (dc.x * dp.y - dc.y * dp.x);
+    let n3 = 1.0 / (dc.x() * dp.y() - dc.y() * dp.x());
 
-    Point {
-        x: (n1 * dp.x - n2 * dc.x) * n3,
-        y: (n1 * dp.y - n2 * dc.y) * n3,
-    }
+    C::from_xy(
+        (n1 * dp.x() - n2 * dc.x()) * n3,
+        (n1 * dp.y() - n2 * dc.y()) * n3,
+    )
 }
 
 /// Sutherland-Hodgman clipping modified from https://rosettacode.org/wiki/Sutherland-Hodgman_polygon_clipping#C.2B.2B
-pub fn sutherland_hodgman(subject: &Polygon, clip: &Polygon) -> Polygon {
+pub fn sutherland_hodgman<C: Coord + Clone>(subject: &Polygon<C>, clip: &Polygon<C>) -> Polygon<C> {
     let mut output_polygon = Polygon::new();
     let mut input_polygon = Polygon::new();
 

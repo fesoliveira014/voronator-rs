@@ -26,15 +26,15 @@
 //!
 //! # Example
 //!
-//! ```no_run
+//! ```
 //! extern crate voronator;
-//!
-//! use voronator::delaunator::{triangulate_from_tuple};
+//! 
+//! use voronator::delaunator::{Point, triangulate_from_tuple};
 //!
 //! fn main() {
 //!     let points = vec![(0., 0.), (1., 0.), (1., 1.), (0., 1.)];
 //!
-//!     let (t, _) = triangulate_from_tuple(&points)
+//!     let (t, _) = triangulate_from_tuple::<Point>(&points)
 //!         .expect("No triangulation exists for this input.");
 //!
 //!     for i in 0..t.len() {
@@ -54,6 +54,8 @@
 //! [`halfedges`]: ./struct.Triangulation.html#structfield.halfedges
 //! [`hull`]: ./struct.Triangulation.html#structfield.hull
 
+
+use rayon::prelude::*;
 use std::{f64, fmt, usize};
 
 /// Defines a comparison epsilon used for floating-point comparisons
@@ -61,6 +63,88 @@ pub const EPSILON: f64 = f64::EPSILON * 2.0;
 
 /// Defines an invalid index in the Triangulation vectors
 pub const INVALID_INDEX: usize = usize::max_value();
+
+/// Trait for a coordinate (point) used to generate a Voronoi diagram. The default included struct `Point` is 
+/// included below as an example.
+/// 
+/// ```no_run
+/// use voronator::delaunator::{Coord, Vector};
+/// 
+/// #[derive(Clone, PartialEq)]
+/// /// Represents a point in the 2D space.
+/// pub struct Point {
+///    /// X coordinate of the point
+///    pub x: f64,
+///    /// Y coordinate of the point
+///    pub y: f64,
+/// }
+///
+/// impl Coord for Point {
+///    // Inline these methods as otherwise we incur a heavy performance penalty
+///    #[inline(always)]
+///    fn from_xy(x: f64, y: f64) -> Self {
+///        Point{x, y}
+///    }
+///    #[inline(always)]
+///    fn x(&self) -> f64 {
+///       self.x
+///    }
+///    #[inline(always)]
+///    fn y(&self) -> f64 {
+///        self.y
+///    }
+/// }
+///
+/// impl Vector<Point> for Point {}
+/// ```
+/// 
+pub trait Coord : Sync + Send + Clone {
+    /// Create a coordinate from (x, y) positions
+    fn from_xy(x: f64, y: f64) -> Self;
+    /// Return x coordinate
+    fn x(&self) -> f64;
+    /// Return y coordinate
+    fn y(&self) -> f64;
+
+    /// Return the magnitude of the 2D vector represented by (x, y)
+    fn magnitude2(&self) -> f64 {
+        self.x() * self.x() + self.y() * self.y()
+    }
+}
+
+/// Trait implementing basic vector functions for a `Coord`.
+/// 
+/// To implement this trait, it is possible to simply:
+/// `impl Vector<Point> for Point {}`
+pub trait Vector<C: Coord> {
+    /// 
+    fn vector(p: &C, q: &C) -> C {
+        C::from_xy(q.x() - p.x(), q.y() - p.y())
+    }
+
+    ///
+    fn determinant(p: &C, q: &C) -> f64 {
+        p.x() * q.y() - p.y() * q.x()
+    }
+
+    ///
+    fn dist2(p: &C, q: &C) -> f64 {
+        let d = Self::vector(p, q);
+
+        d.x() * d.x() + d.y() * d.y()
+    }
+
+    /// Test whether two coordinates describe the same point in space
+    fn equals(p: &C, q: &C) -> bool {
+        (p.x() - q.x()).abs() <= EPSILON && (p.y() - q.y()).abs() <= EPSILON
+    }
+
+    /// 
+    fn equals_with_span(p: &C, q: &C, span: f64) -> bool {
+        let dist = Self::dist2(p, q) / span;
+        dist < 1e-20 // dunno about this
+    }
+}
 
 #[derive(Clone, PartialEq)]
 /// Represents a point in the 2D space.
@@ -71,40 +155,28 @@ pub struct Point {
     pub y: f64,
 }
 
-impl fmt::Debug for Point {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{}, {}]", self.x, self.y)
+impl Coord for Point {
+    // Inline these methods as otherwise we incur a heavy performance penalty
+    #[inline(always)]
+    fn from_xy(x: f64, y: f64) -> Self {
+        Point{x, y}
+    }
+    #[inline(always)]
+    fn x(&self) -> f64 {
+        self.x
+    }
+    #[inline(always)]
+    fn y(&self) -> f64 {
+        self.y
     }
 }
 
-impl Point {
-    fn vector(p: &Self, q: &Self) -> Self {
-        Self {
-            x: q.x - p.x,
-            y: q.y - p.y,
-        }
-    }
+impl Vector<Point> for Point {}
 
-    fn determinant(p: &Self, q: &Self) -> f64 {
-        p.x * q.y - p.y * q.x
-    }
 
-    fn dist2(p: &Self, q: &Self) -> f64 {
-        let d = Point::vector(p, q);
-        d.x * d.x + d.y * d.y
-    }
-
-    fn equals(p: &Self, q: &Self) -> bool {
-        (p.x - q.x).abs() <= EPSILON && (p.y - q.y).abs() <= EPSILON
-    }
-
-    fn equals_with_span(p: &Self, q: &Self, span: f64) -> bool {
-        let dist = Point::dist2(p, q) / span;
-        dist < 1e-20 // dunno about this
-    }
-
-    fn magnitude2(&self) -> f64 {
-        self.x * self.x + self.y * self.y
+impl fmt::Debug for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{}, {}]", self.x, self.y)
     }
 }
 
@@ -114,34 +186,34 @@ impl From<(f64, f64)> for Point {
     }
 }
 
-fn in_circle(p: &Point, a: &Point, b: &Point, c: &Point) -> bool {
-    let d = Point::vector(p, a);
-    let e = Point::vector(p, b);
-    let f = Point::vector(p, c);
+fn in_circle<C: Coord + Vector<C>>(p: &C, a: &C, b: &C, c: &C) -> bool {
+    let d = C::vector(p, a);
+    let e = C::vector(p, b);
+    let f = C::vector(p, c);
 
-    let ap = d.x * d.x + d.y * d.y;
-    let bp = e.x * e.x + e.y * e.y;
-    let cp = f.x * f.x + f.y * f.y;
+    let ap = d.x() * d.x() + d.y() * d.y();
+    let bp = e.x() * e.x() + e.y() * e.y();
+    let cp = f.x() * f.x() + f.y() * f.y();
 
     #[rustfmt::skip]
-    let res = d.x * (e.y * cp  - bp  * f.y) -
-                   d.y * (e.x * cp  - bp  * f.x) +
-                   ap  * (e.x * f.y - e.y * f.x) ;
+    let res = d.x() * (e.y() * cp  - bp  * f.y()) -
+                   d.y() * (e.x() * cp  - bp  * f.x()) +
+                   ap  * (e.x() * f.y() - e.y() * f.x()) ;
 
     res < 0.0
 }
 
 #[rustfmt::skip]
-fn circumradius(a: &Point, b: &Point, c: &Point) -> f64 {
-    let d = Point::vector(a, b);
-    let e = Point::vector(a, c);
+fn circumradius<C: Coord + Vector<C>>(a: &C, b: &C, c: &C) -> f64 {
+    let d = C::vector(a, b);
+    let e = C::vector(a, c);
 
     let bl = d.magnitude2();
     let cl = e.magnitude2();
-    let det = Point::determinant(&d, &e);
+    let det = C::determinant(&d, &e);
 
-    let x = (e.y * bl - d.y * cl) * (0.5 / det);
-    let y = (d.x * cl - e.x * bl) * (0.5 / det);
+    let x = (e.y() * bl - d.y() * cl) * (0.5 / det);
+    let y = (d.x() * cl - e.x() * bl) * (0.5 / det);
 
     if (bl != 0.0) &&
        (cl != 0.0) &&
@@ -160,33 +232,33 @@ fn circumradius(a: &Point, b: &Point, c: &Point) -> f64 {
 /// * `b` - The second vertex of the triangle
 /// * `c` - The third vertex of the triangle
 #[rustfmt::skip]
-pub fn circumcenter(a: &Point, b: &Point, c: &Point) -> Option<Point> {
-    let d = Point::vector(a, b);
-    let e = Point::vector(a, c);
+pub fn circumcenter<C: Coord + Vector<C>>(a: &C, b: &C, c: &C) -> Option<C> {
+    let d = C::vector(a, b);
+    let e = C::vector(a, c);
 
     let bl = d.magnitude2();
     let cl = e.magnitude2();
-    let det = Point::determinant(&d, &e);
+    let det = C::determinant(&d, &e);
 
-    let x = (e.y * bl - d.y * cl) * (0.5 / det);
-    let y = (d.x * cl - e.x * bl) * (0.5 / det);
+    let x = (e.y() * bl - d.y() * cl) * (0.5 / det);
+    let y = (d.x() * cl - e.x() * bl) * (0.5 / det);
 
     if (bl != 0.0) &&
        (cl != 0.0) &&
        (det != 0.0) {
-        Some(Point {
-            x: a.x + x,
-            y: a.y + y,
-        })
+        Some(C::from_xy(
+            a.x() + x,
+            a.y() + y)
+        )
     } else {
         None
     }
 }
 
-fn counter_clockwise(p0: &Point, p1: &Point, p2: &Point) -> bool {
-    let v0 = Point::vector(p0, p1);
-    let v1 = Point::vector(p0, p2);
-    let det = Point::determinant(&v0, &v1);
+fn counter_clockwise<C: Coord + Vector<C>>(p0: &C, p1: &C, p2: &C) -> bool {
+    let v0 = C::vector(p0, p1);
+    let v1 = C::vector(p0, p2);
+    let det = C::determinant(&v0, &v1);
     let dist = v0.magnitude2() + v1.magnitude2();
 
     if det == 0. {
@@ -338,7 +410,7 @@ impl Triangulation {
         self.triangles.len() / 3
     }
 
-    fn legalize(&mut self, p: usize, points: &[Point], hull: &mut Hull) -> usize {
+    fn legalize<C: Coord + Vector<C>>(&mut self, p: usize, points: &[C], hull: &mut Hull<C>) -> usize {
         /* if the pair of triangles doesn't satisfy the Delaunay condition
          * (p1 is inside the circumcircle of [p0, pl, pr]), flip them,
          * then do the same check/flip recursively for the new pair of triangles
@@ -493,26 +565,26 @@ fn fast_mod(i: usize, c: usize) -> usize {
 
 // monotonically increases with real angle,
 // but doesn't need expensive trigonometry
-fn pseudo_angle(d: &Point) -> f64 {
-    let p = d.x / (d.x.abs() + d.y.abs());
-    if d.y > 0.0 {
+fn pseudo_angle<C: Coord + Vector<C>>(d: &C) -> f64 {
+    let p = d.x() / (d.x().abs() + d.y().abs());
+    if d.y() > 0.0 {
         (3.0 - p) / 4.0
     } else {
         (1.0 + p) / 4.0
     }
 }
 
-struct Hull {
+struct Hull<C: Coord> {
     prev: Vec<usize>,
     next: Vec<usize>,
     tri: Vec<usize>,
     hash: Vec<usize>,
     start: usize,
-    center: Point,
+    center: C,
 }
 
-impl Hull {
-    fn new(n: usize, center: &Point, i0: usize, i1: usize, i2: usize, points: &[Point]) -> Self {
+impl<C: Coord + Vector<C>> Hull<C> {
+    fn new(n: usize, center: &C, i0: usize, i1: usize, i2: usize, points: &[C]) -> Self {
         // initialize a hash table for storing edges of the advancing convex hull
         let hash_len = (n as f64).sqrt().ceil() as usize;
 
@@ -545,8 +617,8 @@ impl Hull {
         hull
     }
 
-    fn hash_key(&self, p: &Point) -> usize {
-        let d = Point::vector(&self.center, p);
+    fn hash_key(&self, p: &C) -> usize {
+        let d = C::vector(&self.center, p);
 
         let angle: f64 = pseudo_angle(&d);
         let len = self.hash.len();
@@ -554,12 +626,12 @@ impl Hull {
         fast_mod((angle * (len as f64)).floor() as usize, len)
     }
 
-    fn hash_edge(&mut self, p: &Point, i: usize) {
+    fn hash_edge(&mut self, p: &C, i: usize) {
         let key = self.hash_key(p);
         self.hash[key] = i;
     }
 
-    fn find_visible_edge(&self, p: &Point, span: f64, points: &[Point]) -> (usize, bool) {
+    fn find_visible_edge(&self, p: &C, span: f64, points: &[C]) -> (usize, bool) {
         // find a visible edge on the convex hull using edge hash
         let mut start = 0;
         let key = self.hash_key(p);
@@ -588,8 +660,8 @@ impl Hull {
         loop {
             q = self.next[e];
             // eprintln!("p: {:?}, e: {:?}, q: {:?}", p, &points[e], &points[q]);
-            if Point::equals_with_span(p, &points[e], span)
-                || Point::equals_with_span(p, &points[q], span)
+            if C::equals_with_span(p, &points[e], span)
+                || C::equals_with_span(p, &points[q], span)
             {
                 e = INVALID_INDEX;
                 break;
@@ -608,7 +680,7 @@ impl Hull {
     }
 }
 
-fn calculate_bbox_center(points: &[Point]) -> (Point, f64) {
+fn calculate_bbox_center<C: Coord + Vector<C>>(points: &[C]) -> (C, f64) {
     let mut max = Point {
         x: f64::NEG_INFINITY,
         y: f64::NEG_INFINITY,
@@ -619,10 +691,10 @@ fn calculate_bbox_center(points: &[Point]) -> (Point, f64) {
     };
 
     for point in points {
-        min.x = min.x.min(point.x);
-        min.y = min.y.min(point.y);
-        max.x = max.x.max(point.x);
-        max.y = max.y.max(point.y);
+        min.x = min.x.min(point.x());
+        min.y = min.y.min(point.y());
+        max.x = max.x.max(point.x());
+        max.y = max.y.max(point.y());
     }
 
     let width = max.x - min.x;
@@ -630,21 +702,18 @@ fn calculate_bbox_center(points: &[Point]) -> (Point, f64) {
     let span = width * width + height * height;
 
     (
-        Point {
-            x: (min.x + max.x) / 2.0,
-            y: (min.y + max.y) / 2.0,
-        },
+        C::from_xy((min.x + max.x) / 2.0, (min.y + max.y) / 2.0),
         span,
     )
 }
 
-fn find_closest_point(points: &[Point], p: &Point) -> usize {
+fn find_closest_point<C: Coord + Vector<C>>(points: &[C], p: &C) -> usize {
     let mut min_dist = f64::MAX;
     let mut k = INVALID_INDEX;
 
     for (i, q) in points.iter().enumerate() {
         if i != k {
-            let d = Point::dist2(&p, &q);
+            let d = C::dist2(&p, &q);
 
             if d < min_dist && d > 0.0 {
                 k = i;
@@ -656,7 +725,7 @@ fn find_closest_point(points: &[Point], p: &Point) -> usize {
     k
 }
 
-fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize, usize)> {
+fn find_seed_triangle<C: Coord + Vector<C>>(center: &C, points: &[C]) -> Option<(usize, usize, usize)> {
     let i0 = find_closest_point(points, center);
     let p0 = &points[i0];
 
@@ -669,7 +738,7 @@ fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize,
     let mut i2 = INVALID_INDEX;
     for (i, p) in points.iter().enumerate() {
         if i != i0 && i != i1 {
-            let r = circumradius(&p0, &p1, &p);
+            let r = circumradius(p0, p1, p);
 
             if r < min_radius {
                 i2 = i;
@@ -683,7 +752,7 @@ fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize,
     } else {
         let p2 = &points[i2];
 
-        if counter_clockwise(&p0, &p1, &p2) {
+        if counter_clockwise(p0, p1, p2) {
             std::mem::swap(&mut i1, &mut i2)
         }
 
@@ -691,13 +760,10 @@ fn find_seed_triangle(center: &Point, points: &[Point]) -> Option<(usize, usize,
     }
 }
 
-fn to_points(coords: &[f64]) -> Vec<Point> {
+fn to_points<C: Coord + Vector<C>>(coords: &[f64]) -> Vec<C> {
     coords
         .chunks(2)
-        .map(|tuple| Point {
-            x: tuple[0],
-            y: tuple[1],
-        })
+        .map(|tuple| C::from_xy(tuple[0], tuple[1]))
         .collect()
 }
 
@@ -713,7 +779,7 @@ fn to_points(coords: &[f64]) -> Vec<Point> {
 ///
 /// * `coords` - A vector of `f64` of size `2n`, where for each point `i`, `x = 2i`
 /// and y = `2i + 1`.
-pub fn triangulate_from_arr(coords: &[f64]) -> Option<(Triangulation, Vec<Point>)> {
+pub fn triangulate_from_arr<C: Coord + Vector<C>>(coords: &[f64]) -> Option<(Triangulation, Vec<C>)> {
     let n = coords.len();
 
     if n % 2 != 0 {
@@ -736,8 +802,8 @@ pub fn triangulate_from_arr(coords: &[f64]) -> Option<(Triangulation, Vec<Point>
 /// # Arguments
 ///
 /// * `coords` - A vector of tuples, where each tuple is a `(f64, f64)`
-pub fn triangulate_from_tuple(coords: &[(f64, f64)]) -> Option<(Triangulation, Vec<Point>)> {
-    let points: Vec<Point> = coords.iter().map(|p| Point { x: p.0, y: p.1 }).collect();
+pub fn triangulate_from_tuple<C: Coord + Vector<C>>(coords: &[(f64, f64)]) -> Option<(Triangulation, Vec<C>)> {
+    let points: Vec<C> = coords.iter().map(|p| C::from_xy(p.0, p.1)).collect();
 
     let triangulation = triangulate(&points)?;
 
@@ -749,7 +815,7 @@ pub fn triangulate_from_tuple(coords: &[(f64, f64)]) -> Option<(Triangulation, V
 /// # Arguments
 ///
 /// * `points` - The set of points
-pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
+pub fn triangulate<C: Coord + Vector<C>>(points: &[C]) -> Option<Triangulation> {
     if points.len() < 3 {
         return None;
     }
@@ -764,16 +830,16 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
     let p1 = &points[i1];
     let p2 = &points[i2];
 
-    let center = circumcenter(&p0, &p1, &p2).unwrap();
+    let center = circumcenter(p0, p1, p2).unwrap();
 
     //eprintln!("calculating dists...");
 
     // Calculate the distances from the center once to avoid having to
     // calculate for each compare.
     let mut dists: Vec<(usize, f64)> = points
-        .iter()
+        .par_iter()
         .enumerate()
-        .map(|(i, _)| (i, Point::dist2(&points[i], &center)))
+        .map(|(i, _)| (i, C::dist2(&points[i], &center)))
         .collect();
 
     // sort the points by distance from the seed triangle circumcenter
@@ -786,10 +852,7 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
     let mut triangulation = Triangulation::new(points.len());
     triangulation.add_triangle(i0, i1, i2, INVALID_INDEX, INVALID_INDEX, INVALID_INDEX);
 
-    let mut pp = Point {
-        x: f64::NAN,
-        y: f64::NAN,
-    };
+    let mut pp = C::from_xy(f64::NAN, f64::NAN);
 
     //eprintln!("iterating points...");
     // go through points based on distance from the center.
@@ -797,7 +860,7 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
         let p = &points[i];
 
         // skip near-duplicate points
-        if k > 0 && Point::equals(p, &pp) {
+        if k > 0 && C::equals(p, &pp) {
             continue;
         }
 
