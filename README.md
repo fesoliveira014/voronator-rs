@@ -10,6 +10,7 @@ extern crate voronator;
 extern crate rand;
 
 use voronator::VoronoiDiagram;
+use voronator::delaunator::Point;
 use rand::prelude::*;
 use rand::distributions::Uniform;
 
