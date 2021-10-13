@@ -26,7 +26,7 @@
 //!
 //! # Example
 //!
-//! ```no_run
+//! ```
 //! extern crate voronator;
 //! 
 //! use voronator::delaunator::{Point, triangulate_from_tuple};
@@ -64,42 +64,87 @@ pub const EPSILON: f64 = f64::EPSILON * 2.0;
 /// Defines an invalid index in the Triangulation vectors
 pub const INVALID_INDEX: usize = usize::max_value();
 
+/// Trait for a coordinate (point) used to generate a Voronoi diagram. The default included struct `Point` is 
+/// included below as an example.
+/// 
+/// ```no_run
+/// use voronator::delaunator::{Coord, Vector};
+/// 
+/// #[derive(Clone, PartialEq)]
+/// /// Represents a point in the 2D space.
+/// pub struct Point {
+///    /// X coordinate of the point
+///    pub x: f64,
+///    /// Y coordinate of the point
+///    pub y: f64,
+/// }
+///
+/// impl Coord for Point {
+///    // Inline these methods as otherwise we incur a heavy performance penalty
+///    #[inline(always)]
+///    fn from_xy(x: f64, y: f64) -> Self {
+///        Point{x, y}
+///    }
+///    #[inline(always)]
+///    fn x(&self) -> f64 {
+///       self.x
+///    }
+///    #[inline(always)]
+///    fn y(&self) -> f64 {
+///        self.y
+///    }
+/// }
+///
+/// impl Vector<Point> for Point {}
+/// ```
 /// 
 pub trait Coord : Sync + Send + Clone {
+    /// Create a coordinate from (x, y) positions
     fn from_xy(x: f64, y: f64) -> Self;
+    /// Return x coordinate
     fn x(&self) -> f64;
+    /// Return y coordinate
     fn y(&self) -> f64;
 
+    /// Return the magnitude of the 2D vector represented by (x, y)
     fn magnitude2(&self) -> f64 {
         self.x() * self.x() + self.y() * self.y()
     }
 }
 
+/// Trait implementing basic vector functions for a `Coord`.
+/// 
+/// To implement this trait, it is possible to simply:
+/// `impl Vector<Point> for Point {}`
 pub trait Vector<C: Coord> {
+    /// 
     fn vector(p: &C, q: &C) -> C {
         C::from_xy(q.x() - p.x(), q.y() - p.y())
     }
 
+    ///
     fn determinant(p: &C, q: &C) -> f64 {
         p.x() * q.y() - p.y() * q.x()
     }
 
+    ///
     fn dist2(p: &C, q: &C) -> f64 {
         let d = Self::vector(p, q);
 
         d.x() * d.x() + d.y() * d.y()
     }
 
+    /// Test whether two coordinates describe the same point in space
     fn equals(p: &C, q: &C) -> bool {
         (p.x() - q.x()).abs() <= EPSILON && (p.y() - q.y()).abs() <= EPSILON
     }
 
+    /// 
     fn equals_with_span(p: &C, q: &C, span: f64) -> bool {
         let dist = Self::dist2(p, q) / span;
         dist < 1e-20 // dunno about this
     }
 }
-
 
 #[derive(Clone, PartialEq)]
 /// Represents a point in the 2D space.
