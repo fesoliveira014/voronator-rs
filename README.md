@@ -22,7 +22,7 @@ fn main() {
         .map(|_| (rng.sample(&range1), rng.sample(&range2)))
         .collect();
 
-    let diagram = VoronoiDiagram::from_tuple(&(0., 0.), &(100., 100.), &points).unwrap();
+    let diagram = VoronoiDiagram::<Point>::from_tuple(&(0., 0.), &(100., 100.), &points).unwrap();
     
     for cell in diagram.cells() {
         let p: Vec<(f32, f32)> = cell.points().into_iter()
