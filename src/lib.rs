@@ -82,6 +82,8 @@
 pub mod polygon;
 pub mod delaunator;
 
+use rayon::prelude::*;
+
 use std::{f64, usize};
 
 use crate::delaunator::*;
@@ -267,9 +269,7 @@ impl VoronoiDiagram {
         delaunay: &Triangulation,
         clip_polygon: &Polygon,
     ) -> Vec<Polygon> {
-        let mut polygons: Vec<Polygon> = vec![];
-
-        for t in 0..points.len() {
+        points.par_iter().enumerate().map(|(t, _point)| {
             let incoming = delaunay.inedges[t];
             let edges = edges_around_point(incoming, delaunay);
             let triangles: Vec<usize> = edges.into_iter().map(triangle_of_edge).collect();
@@ -278,10 +278,8 @@ impl VoronoiDiagram {
             let polygon = polygon::Polygon::from_points(polygon);
             let polygon = polygon::sutherland_hodgman(&polygon, &clip_polygon);
 
-            polygons.push(polygon);
-        }
-
-        polygons
+            polygon
+        }).collect()
     }
 }
 
@@ -305,46 +303,43 @@ fn calculate_centroids(points: &[Point], delaunay: &Triangulation) -> Vec<Point>
 }
 
 fn calculate_circumcenters(points: &[Point], delaunay: &Triangulation) -> Vec<Point> {
-    let num_triangles = delaunay.len();
-    let mut circumcenters = vec![Point { x: 0., y: 0. }; num_triangles];
-    for t in 0..num_triangles {
+    (0..delaunay.len()).into_par_iter().map(|t| {
         let v: Vec<Point> = points_of_triangle(t, delaunay)
-            .into_iter()
-            .map(|p| points[p].clone())
-            .collect();
-        if let Some(c) = circumcenter(&v[0], &v[1], &v[2]) {
-            circumcenters[t] = c;
+        .into_iter()
+        .map(|p| points[p].clone())
+        .collect();
+
+        match circumcenter(&v[0], &v[1], &v[2]) {
+            Some(c) => c,
+            None => Point { x: 0., y: 0. }
         }
-    }
-    circumcenters
+    }).collect()
 }
 
 fn calculate_neighbors(points: &[Point], delaunay: &Triangulation) -> Vec<Vec<usize>> {
-    let num_points = points.len();
-    let mut neighbors: Vec<Vec<usize>> = vec![vec![]; num_points];
+    points.par_iter().enumerate().map(|(t, _point)| {
+        let mut neighbours: Vec<usize> = vec![];
 
-    for t in 0..num_points {
         let e0 = delaunay.inedges[t];
-        if e0 == INVALID_INDEX {
-            continue;
+        if e0 != INVALID_INDEX {
+            let mut e = e0;
+            loop {
+                neighbours.push(delaunay.triangles[e]);
+                e = next_halfedge(e);
+                if delaunay.triangles[e] != t {
+                    break;
+                }
+                e = delaunay.halfedges[e];
+                if e == INVALID_INDEX {
+                    neighbours.push(delaunay.triangles[delaunay.outedges[t]]);
+                    break;
+                }
+                if e == e0 {
+                    break;
+                }
+            }
         }
-        let mut e = e0;
-        loop {
-            neighbors[t].push(delaunay.triangles[e]);
-            e = next_halfedge(e);
-            if delaunay.triangles[e] != t {
-                break;
-            }
-            e = delaunay.halfedges[e];
-            if e == INVALID_INDEX {
-                neighbors[t].push(delaunay.triangles[delaunay.outedges[t]]);
-                break;
-            }
-            if e == e0 {
-                break;
-            }
-        }
-    }
 
-    neighbors
+        neighbours
+    }).collect()
 }

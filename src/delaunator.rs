@@ -54,6 +54,8 @@
 //! [`halfedges`]: ./struct.Triangulation.html#structfield.halfedges
 //! [`hull`]: ./struct.Triangulation.html#structfield.hull
 
+
+use rayon::prelude::*;
 use std::{f64, fmt, usize};
 
 /// Defines a comparison epsilon used for floating-point comparisons
@@ -771,7 +773,7 @@ pub fn triangulate(points: &[Point]) -> Option<Triangulation> {
     // Calculate the distances from the center once to avoid having to
     // calculate for each compare.
     let mut dists: Vec<(usize, f64)> = points
-        .iter()
+        .par_iter()
         .enumerate()
         .map(|(i, _)| (i, Point::dist2(&points[i], &center)))
         .collect();

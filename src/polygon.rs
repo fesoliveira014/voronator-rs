@@ -6,7 +6,8 @@
 //!
 //! ```no_run
 //! extern crate voronator;
-//!
+//! 
+//! use voronator::delaunator::Point;
 //! use voronator::polygon::Polygon;
 //!
 //! fn main() {
