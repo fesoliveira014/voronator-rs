@@ -84,9 +84,8 @@
 pub mod polygon;
 pub mod delaunator;
 
-use rayon::prelude::*;
-
 use std::{f64, usize};
+use maybe_parallel_iterator::{IntoMaybeParallelIterator, IntoMaybeParallelRefIterator};
 
 use crate::delaunator::*;
 use crate::polygon::*;
@@ -273,7 +272,7 @@ impl<C: Coord + Vector<C>> VoronoiDiagram<C> {
         delaunay: &Triangulation,
         clip_polygon: &Polygon<C>,
     ) -> Vec<Polygon<C>> {
-        points.par_iter().enumerate().map(|(t, _point)| {
+        points.maybe_par_iter().enumerate().map(|(t, _point)| {
             let incoming = delaunay.inedges[t];
             let edges = edges_around_point(incoming, delaunay);
             let triangles: Vec<usize> = edges.into_iter().map(triangle_of_edge).collect();
@@ -307,7 +306,7 @@ fn calculate_centroids<C: Coord + Vector<C>>(points: &[C], delaunay: &Triangulat
 }
 
 fn calculate_circumcenters<C: Coord + Vector<C>>(points: &[C], delaunay: &Triangulation) -> Vec<C> {
-    (0..delaunay.len()).into_par_iter().map(|t| {
+    (0..delaunay.len()).into_maybe_par_iter().map(|t| {
         let v: Vec<C> = points_of_triangle(t, delaunay)
         .into_iter()
         .map(|p| points[p].clone())
@@ -321,7 +320,7 @@ fn calculate_circumcenters<C: Coord + Vector<C>>(points: &[C], delaunay: &Triang
 }
 
 fn calculate_neighbors<C: Coord + Vector<C>>(points: &[C], delaunay: &Triangulation) -> Vec<Vec<usize>> {
-    points.par_iter().enumerate().map(|(t, _point)| {
+    points.maybe_par_iter().enumerate().map(|(t, _point)| {
         let mut neighbours: Vec<usize> = vec![];
 
         let e0 = delaunay.inedges[t];
