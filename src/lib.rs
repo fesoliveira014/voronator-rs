@@ -84,8 +84,8 @@
 pub mod polygon;
 pub mod delaunator;
 
-use std::{f64, usize};
 use maybe_parallel_iterator::{IntoMaybeParallelIterator, IntoMaybeParallelRefIterator};
+use std::{f64, usize};
 
 use crate::delaunator::*;
 use crate::polygon::*;
