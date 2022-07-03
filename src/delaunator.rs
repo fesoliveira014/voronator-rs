@@ -55,7 +55,7 @@
 //! [`hull`]: ./struct.Triangulation.html#structfield.hull
 
 
-use rayon::prelude::*;
+use maybe_parallel_iterator::IntoMaybeParallelRefIterator;
 use std::{f64, fmt, usize};
 
 /// Defines a comparison epsilon used for floating-point comparisons
@@ -837,7 +837,7 @@ pub fn triangulate<C: Coord + Vector<C>>(points: &[C]) -> Option<Triangulation> 
     // Calculate the distances from the center once to avoid having to
     // calculate for each compare.
     let mut dists: Vec<(usize, f64)> = points
-        .par_iter()
+        .maybe_par_iter()
         .enumerate()
         .map(|(i, _)| (i, C::dist2(&points[i], &center)))
         .collect();
