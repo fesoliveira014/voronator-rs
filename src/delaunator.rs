@@ -146,7 +146,7 @@ pub trait Vector<C: Coord> {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, PartialOrd)]
 /// Represents a point in the 2D space.
 pub struct Point {
     /// X coordinate of the point
@@ -376,6 +376,7 @@ pub fn edges_around_point(start: usize, delaunay: &Triangulation) -> Vec<usize> 
 ///
 /// [`delaunator`]: ./index.html#example
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Triangulation {
     /// Contains the indices for each vertex of a triangle in the original array. All triangles are directed counter-clockwise.
     pub triangles: Vec<usize>,
@@ -574,6 +575,7 @@ fn pseudo_angle<C: Coord + Vector<C>>(d: &C) -> f64 {
     }
 }
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 struct Hull<C: Coord> {
     prev: Vec<usize>,
     next: Vec<usize>,

@@ -91,6 +91,7 @@ use crate::delaunator::*;
 use crate::polygon::*;
 
 /// Represents a centroidal tesselation diagram.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct CentroidDiagram<C: Coord + Vector<C>> {
     /// Contains the input data
     pub sites: Vec<C>,
@@ -185,6 +186,7 @@ fn helper_points<C: Coord>(polygon: &Polygon<C>) -> Vec<C> {
 }
 
 /// Represents a Voronoi diagram.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct VoronoiDiagram<C: Coord + Vector<C>> {
     /// Contains the input data
     pub sites: Vec<C>,
