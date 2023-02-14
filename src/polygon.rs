@@ -19,6 +19,7 @@
 use crate::delaunator::Coord;
 
 /// Represents a polygon.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Polygon<C: Coord> {
     pub(crate) points: Vec<C>,
 }
