@@ -3,6 +3,7 @@ extern crate rand;
 extern crate voronator;
 
 use plotters::prelude::*;
+use plotters::coord::types::RangedCoordf32;
 use rand::prelude::*;
 use voronator::delaunator::Point;
 #[allow(unused_imports)]
@@ -56,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = BitMapBackend::new("plot.png", (IMG_WIDTH, IMG_HEIGHT)).into_drawing_area();
     root.fill(&WHITE)?;
 
-    let root = root.apply_coord_spec(RangedCoord::<RangedCoordf32, RangedCoordf32>::new(
+    let root = root.apply_coord_spec(Cartesian2d::<RangedCoordf32, RangedCoordf32>::new(
         0f32..IMG_WIDTH as f32,
         0f32..IMG_HEIGHT as f32,
         (0..IMG_WIDTH as i32, 0..IMG_HEIGHT as i32),
@@ -65,17 +66,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("triangles: {}", diagram.delaunay.len());
     println!("cells: {}", diagram.cells().len());
 
-    // for cell in &diagram.cells {
-    //     let color = RGBColor{0: rng.gen(), 1: rng.gen(), 2: rng.gen()};
-    //     let p: Vec<(f32, f32)> = cell.into_iter().map(|x| (x.x as f32, x.y as f32)).collect();
+    // Draw this two ways, because we can. First the regions ...
+    let mut rng = rand::thread_rng();
+    for cell in &diagram.cells {
+        let color = RGBColor{0: rng.gen(), 1: rng.gen(), 2: rng.gen()};
+        let p: Vec<(f32, f32)> = cell.points.iter().map(|x| (x.x as f32, x.y as f32)).collect();
+        let poly = Polygon::new(p.clone(), ShapeStyle{color: color.to_rgba(), filled: true, stroke_width: 2});
+        root.draw(&poly)?;
+    }
 
-    //     let poly = Polygon::new(p.clone(), ShapeStyle{color: color.to_rgba(), filled: true, stroke_width: 2});
-    //     root.draw(&poly)?;
-    // }
-
+    // ... then the edges
     for cell in diagram.cells() {
         let p: Vec<(f32, f32)> = cell.points().into_iter().map(|x| (x.x as f32, x.y as f32)).collect();
-
         for _ in 0..p.len() {
             let plot = PathElement::new(
                 p.clone(),

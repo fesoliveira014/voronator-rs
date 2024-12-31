@@ -40,12 +40,12 @@
 //!         .collect();
 //!
 //!     let diagram = VoronoiDiagram::<Point>::from_tuple(&(0., 0.), &(100., 100.), &points).unwrap();
-//!     
+//!
 //!     for cell in diagram.cells() {
 //!         let p: Vec<(f32, f32)> = cell.points().into_iter()
 //!             .map(|x| (x.x as f32, x.y as f32))
 //!             .collect();
-//!         
+//!
 //!         println!("{:?}", p);
 //!     }
 //! }
@@ -70,12 +70,12 @@
 //!         .collect();
 //!
 //!     let diagram = CentroidDiagram::<Point>::from_tuple(&points).unwrap();
-//!     
+//!
 //!     for cell in diagram.cells {
 //!         let p: Vec<(f32, f32)> = cell.points().into_iter()
 //!             .map(|x| (x.x as f32, x.y as f32))
 //!             .collect();
-//!         
+//!
 //!         println!("{:?}", p);
 //!     }
 //! }
@@ -197,7 +197,7 @@ pub struct VoronoiDiagram<C: Coord + Vector<C>> {
     /// Stores the circumcenter of each triangle
     pub centers: Vec<C>,
     /// Stores the coordinates of each vertex of a cell, in counter-clockwise order
-    cells: Vec<Polygon<C>>,
+    pub cells: Vec<Polygon<C>>,
     /// Stores the neighbor of each cell
     pub neighbors: Vec<Vec<usize>>,
 
@@ -222,7 +222,7 @@ impl<C: Coord + Vector<C>> VoronoiDiagram<C> {
     /// Points are represented here as anything that implements [`delaunator::Coord` and `delaunator::Vector<Coord>`].
     /// [`delaunator::Coord`]: ./delaunator/trait.Coord.html
     pub fn with_bounding_polygon(mut points: Vec<C>, clip_polygon: &Polygon<C>) -> Option<Self> {
-        // Add in the 
+        // Add in the
         let mut helper_points = helper_points(&clip_polygon);
         let num_helper_points = helper_points.len();
         points.append(&mut helper_points);
@@ -252,10 +252,10 @@ impl<C: Coord + Vector<C>> VoronoiDiagram<C> {
     /// Points are represented here as a `(f64, f64)` tuple.
     pub fn from_tuple(min: &(f64, f64), max: &(f64, f64), coords: &[(f64, f64)]) -> Option<Self> {
         let points: Vec<C> = coords.iter().map(|p| C::from_xy(p.0, p.1)).collect();
-        
+
         let clip_points = vec![C::from_xy(min.0, min.1), C::from_xy(max.0, min.1),
         C::from_xy(max.0, max.1), C::from_xy(min.0, max.1)];
-        
+
         let clip_polygon = polygon::Polygon::from_points(clip_points);
 
         VoronoiDiagram::with_bounding_polygon(points, &clip_polygon)

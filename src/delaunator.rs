@@ -28,7 +28,7 @@
 //!
 //! ```
 //! extern crate voronator;
-//! 
+//!
 //! use voronator::delaunator::{Point, triangulate_from_tuple};
 //!
 //! fn main() {
@@ -64,12 +64,12 @@ pub const EPSILON: f64 = f64::EPSILON * 2.0;
 /// Defines an invalid index in the Triangulation vectors
 pub const INVALID_INDEX: usize = usize::max_value();
 
-/// Trait for a coordinate (point) used to generate a Voronoi diagram. The default included struct `Point` is 
+/// Trait for a coordinate (point) used to generate a Voronoi diagram. The default included struct `Point` is
 /// included below as an example.
-/// 
+///
 /// ```no_run
 /// use voronator::delaunator::{Coord, Vector};
-/// 
+///
 /// #[derive(Clone, PartialEq)]
 /// /// Represents a point in the 2D space.
 /// pub struct Point {
@@ -97,7 +97,7 @@ pub const INVALID_INDEX: usize = usize::max_value();
 ///
 /// impl Vector<Point> for Point {}
 /// ```
-/// 
+///
 pub trait Coord : Sync + Send + Clone {
     /// Create a coordinate from (x, y) positions
     fn from_xy(x: f64, y: f64) -> Self;
@@ -113,11 +113,11 @@ pub trait Coord : Sync + Send + Clone {
 }
 
 /// Trait implementing basic vector functions for a `Coord`.
-/// 
+///
 /// To implement this trait, it is possible to simply:
 /// `impl Vector<Point> for Point {}`
 pub trait Vector<C: Coord> {
-    /// 
+    ///
     fn vector(p: &C, q: &C) -> C {
         C::from_xy(q.x() - p.x(), q.y() - p.y())
     }
@@ -139,7 +139,7 @@ pub trait Vector<C: Coord> {
         (p.x() - q.x()).abs() <= EPSILON && (p.y() - q.y()).abs() <= EPSILON
     }
 
-    /// 
+    ///
     fn equals_with_span(p: &C, q: &C, span: f64) -> bool {
         let dist = Self::dist2(p, q) / span;
         dist < 1e-20 // dunno about this
@@ -147,6 +147,7 @@ pub trait Vector<C: Coord> {
 }
 
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
+#[repr(C, align(8))]
 /// Represents a point in the 2D space.
 pub struct Point {
     /// X coordinate of the point
