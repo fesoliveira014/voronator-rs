@@ -87,6 +87,9 @@ pub mod delaunator;
 use maybe_parallel_iterator::{IntoMaybeParallelIterator, IntoMaybeParallelRefIterator};
 use std::{f64, usize};
 
+#[cfg(feature = "coloring")]
+use heuristic_graph_coloring::ColorableGraph;
+
 use crate::delaunator::*;
 use crate::polygon::*;
 
@@ -105,6 +108,17 @@ pub struct CentroidDiagram<C: Coord + Vector<C>> {
     pub cells: Vec<Polygon<C>>,
     /// Stores the neighbor of each cell
     pub neighbors: Vec<Vec<usize>>,
+}
+
+#[cfg(feature = "coloring")]
+impl<C: Coord + Vector<C>> ColorableGraph for CentroidDiagram<C> {
+    fn num_vertices(&self) -> usize {
+        self.cells.len()
+    }
+
+    fn neighbors(&self, vi: usize) -> &[usize] {
+        &self.neighbors[vi]
+    }
 }
 
 impl<C: Coord + Vector<C>> CentroidDiagram<C> {
@@ -202,6 +216,17 @@ pub struct VoronoiDiagram<C: Coord + Vector<C>> {
     pub neighbors: Vec<Vec<usize>>,
 
     num_helper_points: usize,
+}
+
+#[cfg(feature = "coloring")]
+impl<C: Coord + Vector<C>> ColorableGraph for VoronoiDiagram<C> {
+    fn num_vertices(&self) -> usize {
+        self.cells.len()
+    }
+
+    fn neighbors(&self, vi: usize) -> &[usize] {
+        &self.neighbors[vi]
+    }
 }
 
 impl<C: Coord + Vector<C>> VoronoiDiagram<C> {

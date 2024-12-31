@@ -8,6 +8,8 @@ use rand::prelude::*;
 use voronator::delaunator::Point;
 #[allow(unused_imports)]
 use voronator::{CentroidDiagram, VoronoiDiagram};
+#[cfg(feature = "coloring")]
+use heuristic_graph_coloring::*;
 
 const IMG_WIDTH: u32 = 500;
 const IMG_HEIGHT: u32 = 500;
@@ -68,8 +70,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Draw this two ways, because we can. First the regions ...
     let mut rng = rand::thread_rng();
-    for cell in &diagram.cells {
+
+    #[cfg(feature = "coloring")]
+    let coloring = color_greedy_by_degree(diagram.clone());
+    #[cfg(feature = "coloring")]
+    let mut colors = vec!();
+    #[cfg(feature = "coloring")]
+    {
+        for _ in 0..(coloring.iter().max().expect("At least one color") + 1) {
+            colors.push(RGBColor{0: rng.gen(), 1: rng.gen(), 2: rng.gen()});
+        }
+    }
+
+    for (_id, cell) in diagram.cells.iter().enumerate() {
+        #[cfg(not(feature = "coloring"))]
         let color = RGBColor{0: rng.gen(), 1: rng.gen(), 2: rng.gen()};
+        #[cfg(feature = "coloring")]
+        let color = colors[coloring[_id]];
+
         let p: Vec<(f32, f32)> = cell.points.iter().map(|x| (x.x as f32, x.y as f32)).collect();
         let poly = Polygon::new(p.clone(), ShapeStyle{color: color.to_rgba(), filled: true, stroke_width: 2});
         root.draw(&poly)?;
