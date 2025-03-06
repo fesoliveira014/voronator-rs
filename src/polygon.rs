@@ -1,12 +1,12 @@
 //! Provides functions for handling polygons.
 //!
 //! Polygons are stored as a Vec<Point>
-//! 
+//!
 //! # Example
 //!
 //! ```no_run
 //! extern crate voronator;
-//! 
+//!
 //! use voronator::delaunator::Point;
 //! use voronator::polygon::Polygon;
 //!
@@ -19,9 +19,11 @@
 use crate::delaunator::Coord;
 
 /// Represents a polygon.
+#[repr(C, align(8))]
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Polygon<C: Coord> {
-    pub(crate) points: Vec<C>,
+    /// The vertices of the polygon.
+    pub points: Vec<C>,
 }
 
 impl<C: Coord> Polygon<C> {

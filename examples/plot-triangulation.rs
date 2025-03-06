@@ -3,6 +3,7 @@ extern crate rand;
 extern crate voronator;
 
 use plotters::prelude::*;
+use plotters::coord::types::RangedCoordf32;
 use rand::prelude::*;
 use rand_distr::Uniform;
 use voronator::delaunator::Point;
@@ -20,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = BitMapBackend::new("plot.png", (960, 400)).into_drawing_area();
     root.fill(&WHITE)?;
 
-    let root = root.apply_coord_spec(RangedCoord::<RangedCoordf32, RangedCoordf32>::new(
+    let root = root.apply_coord_spec(Cartesian2d::<RangedCoordf32, RangedCoordf32>::new(
         0f32..1000f32,
         0f32..1000f32,
         (0..1000, 0..1000),
