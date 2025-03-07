@@ -12,9 +12,11 @@ keywords = ["voronoi", "delaunay", "diagram"]
 [features]
 default = ["rayon"]
 rayon = ["maybe_parallel_iterator/rayon"]
+coloring = ["heuristic-graph-coloring"]
 
 [dependencies]
 maybe_parallel_iterator = "0.12.0"
+heuristic-graph-coloring = { version = "0.1", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
