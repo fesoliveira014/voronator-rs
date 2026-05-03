@@ -69,6 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cells: {}", diagram.cells().len());
 
     // Draw this two ways, because we can. First the regions ...
+    #[cfg(feature = "coloring")]
     let mut rng = rand::thread_rng();
 
     #[cfg(feature = "coloring")]
@@ -84,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (_id, cell) in diagram.cells.iter().enumerate() {
         #[cfg(not(feature = "coloring"))]
-        let color = RGBColor{0: rng.gen(), 1: rng.gen(), 2: rng.gen()};
+        let color = RGBColor{0: 255, 1: 255, 2: 255};
         #[cfg(feature = "coloring")]
         let color = colors[coloring[_id]];
 
