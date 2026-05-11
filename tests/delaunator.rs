@@ -46,7 +46,6 @@ fn issue_13() {
     validate(&points);
 }
 
-
 #[test]
 fn trait_test() {
     let point = Point::from_xy(1.0, 1.0);
@@ -57,7 +56,8 @@ fn trait_test() {
 fn duplicated_points() {
     use std::collections::HashSet;
     let points = [(2520.0, 856.0), (794.0, 66.0), (974.0, 446.0)];
-    let voronoi = VoronoiDiagram::<Point>::from_tuple(&(0.0, 0.0), &(2560.0, 2560.0), &points).unwrap();
+    let voronoi =
+        VoronoiDiagram::<Point>::from_tuple(&(0.0, 0.0), &(2560.0, 2560.0), &points).unwrap();
 
     println!("# cells: {}", voronoi.cells().len());
     for polygon in voronoi.cells() {
@@ -80,7 +80,36 @@ fn duplicated_points() {
 
         assert!(expected == actual)
     }
+}
 
+#[test]
+fn small_padding() {
+    use std::collections::HashSet;
+    let points = vec![(-2.0, 0.0), (-2.1, 1.0), (-2.2, 0.0)];
+    let voronoi =
+        VoronoiDiagram::<Point>::from_tuple(&(-2.22, -0.1), &(-1.98, 1.1), &points).unwrap();
+
+    println!("# cells: {}", voronoi.cells().len());
+    for polygon in voronoi.cells() {
+        let cell_vertices = polygon.points();
+
+        let expected = cell_vertices.len();
+        let actual = cell_vertices
+            .iter()
+            .map(|n| format!("{:?}", n))
+            .collect::<HashSet<String>>()
+            .len();
+        println!(" {} != {}", expected, actual);
+        println!(
+            "{}",
+            cell_vertices
+                .iter()
+                .map(|n| format!("{:?}", n))
+                .collect::<String>()
+        );
+
+        assert!(expected == actual)
+    }
 }
 
 #[test]
